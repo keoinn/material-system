@@ -1,0 +1,40 @@
+/**
+ * SCSS Variables
+ * 系統變數定義
+ */
+
+// 顏色
+$primary-color: #667eea;
+$secondary-color: #764ba2;
+$success-color: #28a745;
+$danger-color: #dc3545;
+$warning-color: #ffc107;
+$info-color: #17a2b8;
+
+// 漸層
+$primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+
+// 間距
+$spacing-xs: 5px;
+$spacing-sm: 10px;
+$spacing-md: 20px;
+$spacing-lg: 30px;
+$spacing-xl: 40px;
+
+// 圓角
+$border-radius-sm: 5px;
+$border-radius-md: 10px;
+$border-radius-lg: 20px;
+
+// 陰影
+$shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+$shadow-md: 0 5px 15px rgba(0, 0, 0, 0.2);
+$shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.3);
+
+// 斷點
+$breakpoint-sm: 576px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 992px;
+$breakpoint-xl: 1200px;
+$breakpoint-xxl: 1600px;
+

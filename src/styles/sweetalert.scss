@@ -1,0 +1,91 @@
+/**
+ * SweetAlert2 自訂樣式
+ * 讓按鈕更明顯易見
+ */
+
+// 確認按鈕樣式
+.swal2-confirm-custom,
+.swal2-confirm {
+  background-color: #667eea !important;
+  color: white !important;
+  font-weight: bold !important;
+  padding: 10px 24px !important;
+  border-radius: 5px !important;
+  border: none !important;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3) !important;
+  transition: all 0.3s ease !important;
+
+  &:hover {
+    background-color: #5568d3 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4) !important;
+  }
+
+  &:focus {
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3) !important;
+  }
+}
+
+// 取消按鈕樣式
+.swal2-cancel-custom,
+.swal2-cancel {
+  background-color: #6c757d !important;
+  color: white !important;
+  font-weight: bold !important;
+  padding: 10px 24px !important;
+  border-radius: 5px !important;
+  border: none !important;
+  box-shadow: 0 2px 4px rgba(108, 117, 125, 0.3) !important;
+  transition: all 0.3s ease !important;
+
+  &:hover {
+    background-color: #5a6268 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 8px rgba(108, 117, 125, 0.4) !important;
+  }
+
+  &:focus {
+    box-shadow: 0 0 0 3px rgba(108, 117, 125, 0.3) !important;
+  }
+}
+
+// 錯誤按鈕樣式
+.swal2-popup[data-icon='error'] .swal2-confirm {
+  background-color: #dc3545 !important;
+  color: white !important;
+
+  &:hover {
+    background-color: #c82333 !important;
+  }
+}
+
+// 警告按鈕樣式
+.swal2-popup[data-icon='warning'] .swal2-confirm {
+  background-color: #ffc107 !important;
+  color: #212529 !important;
+
+  &:hover {
+    background-color: #e0a800 !important;
+  }
+}
+
+// 資訊按鈕樣式
+.swal2-popup[data-icon='info'] .swal2-confirm {
+  background-color: #17a2b8 !important;
+  color: white !important;
+
+  &:hover {
+    background-color: #138496 !important;
+  }
+}
+
+// 成功按鈕樣式
+.swal2-popup[data-icon='success'] .swal2-confirm {
+  background-color: #28a745 !important;
+  color: white !important;
+
+  &:hover {
+    background-color: #218838 !important;
+  }
+}
+

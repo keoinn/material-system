@@ -1,0 +1,162 @@
+/**
+ * Material System V3.5 Styles
+ * 符合原始設計的樣式
+ */
+
+// 顏色定義
+$primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+$primary-color: #667eea;
+$secondary-color: #764ba2;
+$success-color: #28a745;
+$danger-color: #dc3545;
+$warning-color: #ffc107;
+$info-color: #17a2b8;
+
+// 全域樣式
+.material-system {
+  font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif;
+  
+  // 容器樣式
+  .system-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+  }
+
+  // 標題樣式
+  .system-header {
+    background: $primary-gradient;
+    color: white;
+    padding: 30px;
+    text-align: center;
+
+    h1 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+
+    .version {
+      font-size: 1.2em;
+      opacity: 0.9;
+    }
+  }
+
+  // 表單區塊
+  .form-section {
+    margin-bottom: 30px;
+    padding: 25px;
+    background: #f8f9fa;
+    border-radius: 10px;
+
+    h3 {
+      color: $primary-color;
+      margin-bottom: 20px;
+      font-size: 1.3em;
+      border-bottom: 2px solid $primary-color;
+      padding-bottom: 10px;
+    }
+  }
+
+  // 包裝區塊
+  .packaging-section {
+    background: #fff;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+
+    h4 {
+      color: #495057;
+      margin-bottom: 15px;
+      font-size: 1.1em;
+    }
+  }
+
+  // 狀態標籤
+  .status-badge {
+    display: inline-block;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: bold;
+
+    &.status-pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    &.status-approved {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    &.status-rejected {
+      background: #f8d7da;
+      color: #721c24;
+    }
+  }
+
+  // 動畫
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.5s;
+  }
+
+  // 響應式設計
+  @media (max-width: 768px) {
+    .system-header {
+      padding: 20px;
+
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+
+    .form-section {
+      padding: 15px;
+    }
+  }
+}
+
+// Vuetify 覆寫
+.v-application {
+  .v-btn {
+    &.btn-primary {
+      background: $primary-gradient !important;
+      color: white !important;
+    }
+
+    &.btn-success {
+      background: $success-color !important;
+      color: white !important;
+    }
+
+    &.btn-danger {
+      background: $danger-color !important;
+      color: white !important;
+    }
+
+    &.btn-warning {
+      background: $warning-color !important;
+      color: #212529 !important;
+    }
+
+    &.btn-info {
+      background: $info-color !important;
+      color: white !important;
+    }
+  }
+}
+

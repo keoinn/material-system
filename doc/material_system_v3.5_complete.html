@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>物料編碼申請管理系統 V3.5 </title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header .version {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .nav-tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 3px solid #dee2e6;
+        }
+        
+        .nav-tab {
+            padding: 15px 30px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 16px;
+            color: #495057;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .nav-tab:hover {
+            background: #e9ecef;
+        }
+        
+        .nav-tab.active {
+            color: #667eea;
+            background: white;
+        }
+        
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #667eea;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .tab-panel {
+            display: none;
+        }
+        
+        .tab-panel.active {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .form-section {
+            margin-bottom: 30px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .form-section h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .form-group.required label::after {
+            content: ' *';
+            color: #dc3545;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .packaging-section {
+            background: #fff;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .packaging-section h4 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        
+        .checkbox-item:hover {
+            background: #e9ecef;
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 8px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .checkbox-item label {
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-approved {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-rejected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+        }
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            margin-bottom: 20px;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 15px;
+        }
+        
+        .modal-header h2 {
+            color: #495057;
+        }
+        
+        .close-modal {
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #adb5bd;
+        }
+        
+        .close-modal:hover {
+            color: #495057;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .code-preview {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        
+        .code-preview .code-line {
+            margin: 5px 0;
+        }
+        
+        .code-preview .code-highlight {
+            background: #44475a;
+            padding: 2px 5px;
+            border-radius: 3px;
+            color: #50fa7b;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e9ecef;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .checkbox-group {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .nav-tabs {
+                overflow-x: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>物料編碼申請管理系統</h1>
+            <div class="version">V3.5 - 包裝說明增強版</div>
+        </div>
+        
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="switchTab('apply')">物料申請</button>
+            <button class="nav-tab" onclick="switchTab('packaging')">包裝說明設定</button>
+            <button class="nav-tab" onclick="switchTab('review')">審核管理</button>
+            <button class="nav-tab" onclick="switchTab('export')">EXCEL匯出</button>
+            <button class="nav-tab" onclick="switchTab('query')">申請查詢</button>
+            <button class="nav-tab" onclick="switchTab('settings')">系統設定</button>
+        </div>
+        
+        <div class="content">
+            <!-- 物料申請 -->
+            <div id="apply" class="tab-panel active">
+                <div class="form-section">
+                    <h3>基本資料</h3>
+                    <div class="form-grid">
+                        <div class="form-group required">
+                            <label>產品大類</label>
+                            <select id="mainCategory" onchange="updateSubCategories()">
+                                <option value="">請選擇</option>
+                                <option value="H">H - Handle (把手)</option>
+                                <option value="S">S - Slide (滑軌)</option>
+                                <option value="M">M - Module/Assy (模組)</option>
+                                <option value="D">D - Decorative Hardware (裝飾五金)</option>
+                                <option value="F">F - Functional Hardware (功能五金)</option>
+                                <option value="B">B - Builders Hardware (建築五金)</option>
+                                <option value="I">I - Industrial Parts Solution (工業零件)</option>
+                                <option value="O">O - Others (其他)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group required">
+                            <label>產品中類</label>
+                            <select id="subCategory" onchange="updateSpecCategories()">
+                                <option value="">請先選擇大類</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group required">
+                            <label>產品小類</label>
+                            <select id="specCategory" onchange="generateItemCode()">
+                                <option value="">請先選擇中類</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>系統編碼</label>
+                            <input type="text" id="itemCode" readonly style="background: #e9ecef;">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h3>物料資訊</h3>
+                    <div class="form-grid">
+                        <div class="form-group required">
+                            <label>料件說明 (中文)</label>
+                            <input type="text" id="itemNameCN" placeholder="請輸入中文料件說明">
+                        </div>
+                        
+                        <div class="form-group required">
+                            <label>料件說明 (英文)</label>
+                            <input type="text" id="itemNameEN" placeholder="Please enter English item description">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>客戶參考貨號</label>
+                            <input type="text" id="customerRef" placeholder="Customer Reference Number">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>供應商</label>
+                            <select id="supplier">
+                                <option value="">請選擇</option>
+                                <option value="SUP001">供應商A</option>
+                                <option value="SUP002">供應商B</option>
+                                <option value="SUP003">供應商C</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group required">
+                            <label>基本材質</label>
+                            <select id="material">
+                                <option value="">請選擇</option>
+                                <option value="Steel">Steel</option>
+                                <option value="Stainless Steel">Stainless Steel</option>
+                                <option value="Brass">Brass</option>
+                                <option value="Zinc Alloy">Zinc Alloy (Zamak)</option>
+                                <option value="Aluminum">Aluminum</option>
+                                <option value="Plastic">Plastic</option>
+                                <option value="Wood">Wood</option>
+                                <option value="Others">Others</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>表面處理</label>
+                            <select id="surfaceFinish">
+                                <option value="">請選擇</option>
+                                <option value="Chrome Plated">Chrome Plated</option>
+                                <option value="Nickel Plated">Nickel Plated</option>
+                                <option value="Zinc Plated">Zinc Plated</option>
+                                <option value="Powder Coating">Powder Coating</option>
+                                <option value="Anodized">Anodized</option>
+                                <option value="Natural">Natural</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h3>尺寸規格</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>長度 (mm)</label>
+                            <input type="number" id="length" placeholder="Length">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>寬度 (mm)</label>
+                            <input type="number" id="width" placeholder="Width">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>高度 (mm)</label>
+                            <input type="number" id="height" placeholder="Height">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>重量 (g)</label>
+                            <input type="number" id="weight" placeholder="Weight">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h3>包裝說明</h3>
+                    
+                    <!-- 1. 個別產品包裝 -->
+                    <div class="packaging-section">
+                        <h4>1. 個別產品包裝</h4>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="pkg_plastic_bag" name="product_packaging">
+                                <label for="pkg_plastic_bag">塑膠袋</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="pkg_bubble_wrap" name="product_packaging">
+                                <label for="pkg_bubble_wrap">氣泡袋</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="pkg_pe_material" name="product_packaging">
+                                <label for="pkg_pe_material">PE/PP材質</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="pkg_recycling_mark" name="product_packaging">
+                                <label for="pkg_recycling_mark">回收標誌</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="pkg_label" name="product_packaging">
+                                <label for="pkg_label">產品標籤</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="pkg_manual" name="product_packaging">
+                                <label for="pkg_manual">說明書</label>
+                            </div>
+                        </div>
+                        <textarea id="product_packaging_desc" placeholder="額外說明（如：1PC/塑膠袋，印刷回收標誌04 PE-LD）"></textarea>
+                    </div>
+                    
+                    <!-- 2. 配件內容 -->
+                    <div class="packaging-section">
+                        <h4>2. 配件內容</h4>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="acc_screws" name="accessories_content">
+                                <label for="acc_screws">螺絲</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="acc_brackets" name="accessories_content">
+                                <label for="acc_brackets">支架</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="acc_caps" name="accessories_content">
+                                <label for="acc_caps">蓋子/端蓋</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="acc_cushions" name="accessories_content">
+                                <label for="acc_cushions">緩衝墊</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="acc_bulk" name="accessories_content">
+                                <label for="acc_bulk">散裝</label>
+                            </div>
+                        </div>
+                        <textarea id="accessories_content_desc" placeholder="額外說明（如：附木螺絲4顆，螺絲散裝）"></textarea>
+                    </div>
+                    
+                    <!-- 3. 配件 -->
+                    <div class="packaging-section">
+                        <h4>3. 配件</h4>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="acc_supplier" name="accessories">
+                                <label for="acc_supplier">供應商提供</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="acc_customer" name="accessories">
+                                <label for="acc_customer">客戶提供</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="acc_standard" name="accessories">
+                                <label for="acc_standard">標準配件</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="acc_optional" name="accessories">
+                                <label for="acc_optional">選配配件</label>
+                            </div>
+                        </div>
+                        <textarea id="accessories_desc" placeholder="額外說明"></textarea>
+                    </div>
+                    
+                    <!-- 4. 內盒 -->
+                    <div class="packaging-section">
+                        <h4>4. 內盒</h4>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="inner_item_no" name="inner_box">
+                                <label for="inner_item_no">印製ITEM NO.</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="inner_quantity" name="inner_box">
+                                <label for="inner_quantity">印製數量</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="inner_barcode" name="inner_box">
+                                <label for="inner_barcode">條碼</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="inner_label" name="inner_box">
+                                <label for="inner_label">標籤</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="inner_logo" name="inner_box">
+                                <label for="inner_logo">客戶Logo</label>
+                            </div>
+                        </div>
+                        <textarea id="inner_box_desc" placeholder="額外說明（如：內盒上需印製ITEM NO. & Q'TY）"></textarea>
+                    </div>
+                    
+                    <!-- 5. 外箱 -->
+                    <div class="packaging-section">
+                        <h4>5. 外箱</h4>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="outer_corrugated" name="outer_box">
+                                <label for="outer_corrugated">瓦楞紙箱</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="outer_side_mark" name="outer_box">
+                                <label for="outer_side_mark">側嘜</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="outer_customer_no" name="outer_box">
+                                <label for="outer_customer_no">客戶產品編號</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="outer_shipping_mark" name="outer_box">
+                                <label for="outer_shipping_mark">出貨嘜頭</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="outer_fragile" name="outer_box">
+                                <label for="outer_fragile">易碎標誌</label>
+                            </div>
+                        </div>
+                        <textarea id="outer_box_desc" placeholder="額外說明（如：外箱側嘜之ITEM NO.請印製客戶產品編號）"></textarea>
+                    </div>
+                    
+                    <!-- 6. 運輸與托盤要求 -->
+                    <div class="packaging-section">
+                        <h4>6. 運輸與托盤要求</h4>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="trans_pallet" name="transport">
+                                <label for="trans_pallet">托盤/Pallet</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="trans_stretch_film" name="transport">
+                                <label for="trans_stretch_film">纏繞膜</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="trans_corner_protector" name="transport">
+                                <label for="trans_corner_protector">護角</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="trans_strapping" name="transport">
+                                <label for="trans_strapping">打包帶</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="trans_eudr" name="transport">
+                                <label for="trans_eudr">EUDR文件</label>
+                            </div>
+                        </div>
+                        <textarea id="transport_desc" placeholder="額外說明（如：出貨提供EUDR文件）"></textarea>
+                    </div>
+                    
+                    <!-- 7. 裝櫃要求 -->
+                    <div class="packaging-section">
+                        <h4>7. 裝櫃要求</h4>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="container_20ft" name="container">
+                                <label for="container_20ft">20呎櫃</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="container_40ft" name="container">
+                                <label for="container_40ft">40呎櫃</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="container_40hc" name="container">
+                                <label for="container_40hc">40呎高櫃</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="container_pallet_loading" name="container">
+                                <label for="container_pallet_loading">棧板出貨</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="container_floor_loading" name="container">
+                                <label for="container_floor_loading">散裝裝櫃</label>
+                            </div>
+                        </div>
+                        <textarea id="container_desc" placeholder="額外說明（如：256SETS/1X40FCL）"></textarea>
+                    </div>
+                    
+                    <!-- 8. Other -->
+                    <div class="packaging-section">
+                        <h4>8. 其他說明</h4>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="other_fsc" name="other">
+                                <label for="other_fsc">FSC認證</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="other_rohs" name="other">
+                                <label for="other_rohs">RoHS認證</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="other_reach" name="other">
+                                <label for="other_reach">REACH認證</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="other_iso" name="other">
+                                <label for="other_iso">ISO認證</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="other_test_report" name="other">
+                                <label for="other_test_report">測試報告</label>
+                            </div>
+                        </div>
+                        <textarea id="other_desc" placeholder="額外說明（如：供應商具FSC證書）"></textarea>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn btn-secondary" onclick="clearForm()">清除表單</button>
+                    <button class="btn btn-primary" onclick="submitApplication()">提交申請</button>
+                    <button class="btn btn-info" onclick="saveAsDraft()">儲存草稿</button>
+                </div>
+            </div>
+            
+            <!-- 包裝說明設定 -->
+            <div id="packaging" class="tab-panel">
+                <div class="form-section">
+                    <h3>包裝說明模板管理</h3>
+                    <p>在此設定各類別的預設勾選項目和說明模板</p>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>選擇產品大類</label>
+                            <select id="templateCategory" onchange="loadPackagingTemplate()">
+                                <option value="">請選擇</option>
+                                <option value="H">H - Handle (把手)</option>
+                                <option value="S">S - Slide (滑軌)</option>
+                                <option value="M">M - Module/Assy (模組)</option>
+                                <option value="D">D - Decorative Hardware (裝飾五金)</option>
+                                <option value="F">F - Functional Hardware (功能五金)</option>
+                                <option value="B">B - Builders Hardware (建築五金)</option>
+                                <option value="I">I - Industrial Parts Solution (工業零件)</option>
+                                <option value="O">O - Others (其他)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="templateSettings" style="display:none;">
+                        <h4>設定預設包裝選項</h4>
+                        <!-- 這裡會動態載入各類別的包裝模板設定 -->
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="savePackagingTemplate()">儲存模板</button>
+                    <button class="btn btn-secondary" onclick="resetTemplate()">重置為預設</button>
+                </div>
+            </div>
+            
+            <!-- 審核管理 -->
+            <div id="review" class="tab-panel">
+                <div class="form-section">
+                    <h3>待審核申請</h3>
+                    <div class="table-container">
+                        <table id="pendingTable">
+                            <thead>
+                                <tr>
+                                    <th>申請日期</th>
+                                    <th>申請單號</th>
+                                    <th>料號</th>
+                                    <th>料件說明</th>
+                                    <th>申請人</th>
+                                    <th>狀態</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pendingList">
+                                <!-- 動態載入待審核項目 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- EXCEL匯出 -->
+            <div id="export" class="tab-panel">
+                <div class="form-section">
+                    <h3>EXCEL檔案匯出</h3>
+                    <p>選擇要匯出的物料類別和日期範圍，系統將產生對應格式的EXCEL檔案</p>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>物料大類</label>
+                            <select id="exportCategory">
+                                <option value="ALL">全部</option>
+                                <option value="H">H - Handle (把手)</option>
+                                <option value="S">S - Slide (滑軌)</option>
+                                <option value="M">M - Module/Assy (模組)</option>
+                                <option value="D">D - Decorative Hardware (裝飾五金)</option>
+                                <option value="F">F - Functional Hardware (功能五金)</option>
+                                <option value="B">B - Builders Hardware (建築五金)</option>
+                                <option value="I">I - Industrial Parts Solution (工業零件)</option>
+                                <option value="O">O - Others (其他)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>開始日期</label>
+                            <input type="date" id="exportStartDate">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>結束日期</label>
+                            <input type="date" id="exportEndDate">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>狀態</label>
+                            <select id="exportStatus">
+                                <option value="ALL">全部</option>
+                                <option value="APPROVED">已核准</option>
+                                <option value="PENDING">待審核</option>
+                                <option value="REJECTED">已退回</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <strong>注意：</strong>
+                        系統將根據選擇的物料大類產生對應的EXCEL格式。每個大類都有專屬的欄位配置。
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn btn-success" onclick="exportToExcel()">匯出EXCEL</button>
+                    <button class="btn btn-info" onclick="previewExport()">預覽資料</button>
+                </div>
+                
+                <div id="exportPreview" style="display:none;">
+                    <!-- 預覽資料會顯示在這裡 -->
+                </div>
+            </div>
+            
+            <!-- 申請查詢 -->
+            <div id="query" class="tab-panel">
+                <div class="form-section">
+                    <h3>申請記錄查詢</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>料號</label>
+                            <input type="text" id="queryItemCode" placeholder="輸入料號">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>申請人</label>
+                            <input type="text" id="queryApplicant" placeholder="輸入申請人">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>狀態</label>
+                            <select id="queryStatus">
+                                <option value="">全部</option>
+                                <option value="PENDING">待審核</option>
+                                <option value="APPROVED">已核准</option>
+                                <option value="REJECTED">已退回</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>日期範圍</label>
+                            <input type="date" id="queryDateFrom">
+                        </div>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button class="btn btn-primary" onclick="searchApplications()">查詢</button>
+                        <button class="btn btn-secondary" onclick="clearQueryForm()">清除條件</button>
+                    </div>
+                    
+                    <div class="table-container" id="queryResults" style="display:none;">
+                        <!-- 查詢結果會顯示在這裡 -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 系統設定 -->
+            <div id="settings" class="tab-panel">
+                <div class="form-section">
+                    <h3>編碼規則設定</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>編碼格式</label>
+                            <input type="text" id="codeFormat" value="{大類}{中類}.{小類}.{流水號}" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>流水號位數</label>
+                            <select id="serialDigits">
+                                <option value="4">4位數</option>
+                                <option value="5" selected>5位數</option>
+                                <option value="6">6位數</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h3>審核流程設定</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>自動審核</label>
+                            <select id="autoApprove">
+                                <option value="false">關閉</option>
+                                <option value="true">開啟</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Email通知</label>
+                            <select id="emailNotify">
+                                <option value="true">開啟</option>
+                                <option value="false">關閉</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="saveSettings()">儲存設定</button>
+                    <button class="btn btn-warning" onclick="resetSettings()">恢復預設</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal for details view -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>申請詳情</h2>
+                <span class="close-modal" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="modalBody">
+                <!-- 詳細資料會載入這裡 -->
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 全域變數
+        let currentApplication = {};
+        let applications = JSON.parse(localStorage.getItem('applications') || '[]');
+        let templates = JSON.parse(localStorage.getItem('packagingTemplates') || '{}');
+        let codeCounter = JSON.parse(localStorage.getItem('codeCounter') || '{}');
+        
+        // 分類資料
+        const categories = {
+            'H': {
+                name: 'Handle',
+                subCategories: {
+                    '00': '未分類',
+                    '01': 'Knob',
+                    '02': 'Pull',
+                    '03': 'Handle',
+                    '04': 'Bar Handle',
+                    '05': 'Cup Pull',
+                    '06': 'Ring Pull'
+                },
+                specs: {
+                    'A': 'Aluminum',
+                    'B': 'Brass',
+                    'C': 'Chrome',
+                    'S': 'Stainless Steel',
+                    'Z': 'Zinc Alloy'
+                }
+            },
+            'S': {
+                name: 'Slide',
+                subCategories: {
+                    '00': '未分類',
+                    '01': 'Ball Bearing Slide',
+                    '02': 'Undermount Slide',
+                    '03': 'Soft Close Slide',
+                    '04': 'Heavy Duty Slide'
+                },
+                specs: {
+                    'B': 'Ball Bearing',
+                    'S': 'Soft Close',
+                    'F': 'Full Extension',
+                    'P': 'Partial Extension'
+                }
+            },
+            'M': {
+                name: 'Module/Assy',
+                subCategories: {
+                    '00': '未分類',
+                    '01': 'Drawer System',
+                    '02': 'Pull-Out System',
+                    '03': 'Organizer',
+                    '04': 'Basket System'
+                },
+                specs: {
+                    'D': 'Drawer',
+                    'P': 'Pull-Out',
+                    'O': 'Organizer',
+                    'B': 'Basket'
+                }
+            },
+            'D': {
+                name: 'Decorative Hardware',
+                subCategories: {
+                    '00': '未分類',
+                    '01': 'Furniture Leg',
+                    '02': 'Decorative Handle',
+                    '03': 'Ornament'
+                },
+                specs: {
+                    'L': 'Leg',
+                    'H': 'Handle',
+                    'O': 'Ornament'
+                }
+            },
+            'F': {
+                name: 'Functional Hardware',
+                subCategories: {
+                    '00': '未分類',
+                    '01': 'Hinge',
+                    '02': 'Caster',
+                    '03': 'Lock',
+                    '04': 'Catch'
+                },
+                specs: {
+                    'H': 'Hinge',
+                    'C': 'Caster',
+                    'L': 'Lock',
+                    'T': 'Catch'
+                }
+            },
+            'B': {
+                name: 'Builders Hardware',
+                subCategories: {
+                    '00': '未分類',
+                    '01': 'Door Hardware',
+                    '02': 'Window Hardware',
+                    '03': 'Gate Hardware'
+                },
+                specs: {
+                    'D': 'Door',
+                    'W': 'Window',
+                    'G': 'Gate'
+                }
+            },
+            'I': {
+                name: 'Industrial Parts Solution',
+                subCategories: {
+                    '00': '未分類',
+                    '01': 'Industrial Slide',
+                    '02': 'Heavy Duty Component',
+                    '03': 'Custom Solution'
+                },
+                specs: {
+                    'S': 'Slide',
+                    'H': 'Heavy Duty',
+                    'C': 'Custom'
+                }
+            },
+            'O': {
+                name: 'Others',
+                subCategories: {
+                    '00': '未分類',
+                    '99': '其他'
+                },
+                specs: {
+                    'X': '其他'
+                }
+            }
+        };
+        
+        // Tab切換
+        function switchTab(tabName) {
+            // 隱藏所有tab
+            document.querySelectorAll('.tab-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            
+            // 移除所有tab按鈕的active class
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 顯示選中的tab
+            document.getElementById(tabName).classList.add('active');
+            
+            // 設定對應的tab按鈕為active
+            event.target.classList.add('active');
+            
+            // 特殊處理
+            if (tabName === 'review') {
+                loadPendingApplications();
+            }
+        }
+        
+        // 更新中類選項
+        function updateSubCategories() {
+            const mainCat = document.getElementById('mainCategory').value;
+            const subCatSelect = document.getElementById('subCategory');
+            
+            subCatSelect.innerHTML = '<option value="">請選擇</option>';
+            
+            if (mainCat && categories[mainCat]) {
+                const subCats = categories[mainCat].subCategories;
+                for (let code in subCats) {
+                    const option = document.createElement('option');
+                    option.value = code;
+                    option.textContent = `${code} - ${subCats[code]}`;
+                    subCatSelect.appendChild(option);
+                }
+            }
+        }
+        
+        // 更新小類選項
+        function updateSpecCategories() {
+            const mainCat = document.getElementById('mainCategory').value;
+            const specCatSelect = document.getElementById('specCategory');
+            
+            specCatSelect.innerHTML = '<option value="">請選擇</option>';
+            
+            if (mainCat && categories[mainCat]) {
+                const specs = categories[mainCat].specs;
+                for (let code in specs) {
+                    const option = document.createElement('option');
+                    option.value = code;
+                    option.textContent = `${code} - ${specs[code]}`;
+                    specCatSelect.appendChild(option);
+                }
+            }
+        }
+        
+        // 產生料號
+        function generateItemCode() {
+            const mainCat = document.getElementById('mainCategory').value;
+            const subCat = document.getElementById('subCategory').value;
+            const specCat = document.getElementById('specCategory').value;
+            
+            if (mainCat && subCat && specCat) {
+                const key = `${mainCat}${subCat}.${specCat}`;
+                let counter = codeCounter[key] || 0;
+                counter++;
+                codeCounter[key] = counter;
+                
+                const serial = String(counter).padStart(5, '0');
+                const itemCode = `${mainCat}${subCat}.${specCat}.${serial}`;
+                
+                document.getElementById('itemCode').value = itemCode;
+                localStorage.setItem('codeCounter', JSON.stringify(codeCounter));
+            }
+        }
+        
+        // 收集包裝資料
+        function collectPackagingData() {
+            const packagingData = {
+                productPackaging: {
+                    options: [],
+                    description: document.getElementById('product_packaging_desc').value
+                },
+                accessoriesContent: {
+                    options: [],
+                    description: document.getElementById('accessories_content_desc').value
+                },
+                accessories: {
+                    options: [],
+                    description: document.getElementById('accessories_desc').value
+                },
+                innerBox: {
+                    options: [],
+                    description: document.getElementById('inner_box_desc').value
+                },
+                outerBox: {
+                    options: [],
+                    description: document.getElementById('outer_box_desc').value
+                },
+                transport: {
+                    options: [],
+                    description: document.getElementById('transport_desc').value
+                },
+                container: {
+                    options: [],
+                    description: document.getElementById('container_desc').value
+                },
+                other: {
+                    options: [],
+                    description: document.getElementById('other_desc').value
+                }
+            };
+            
+            // 收集勾選的選項
+            document.querySelectorAll('input[name="product_packaging"]:checked').forEach(cb => {
+                packagingData.productPackaging.options.push(cb.nextElementSibling.textContent);
+            });
+            
+            document.querySelectorAll('input[name="accessories_content"]:checked').forEach(cb => {
+                packagingData.accessoriesContent.options.push(cb.nextElementSibling.textContent);
+            });
+            
+            document.querySelectorAll('input[name="accessories"]:checked').forEach(cb => {
+                packagingData.accessories.options.push(cb.nextElementSibling.textContent);
+            });
+            
+            document.querySelectorAll('input[name="inner_box"]:checked').forEach(cb => {
+                packagingData.innerBox.options.push(cb.nextElementSibling.textContent);
+            });
+            
+            document.querySelectorAll('input[name="outer_box"]:checked').forEach(cb => {
+                packagingData.outerBox.options.push(cb.nextElementSibling.textContent);
+            });
+            
+            document.querySelectorAll('input[name="transport"]:checked').forEach(cb => {
+                packagingData.transport.options.push(cb.nextElementSibling.textContent);
+            });
+            
+            document.querySelectorAll('input[name="container"]:checked').forEach(cb => {
+                packagingData.container.options.push(cb.nextElementSibling.textContent);
+            });
+            
+            document.querySelectorAll('input[name="other"]:checked').forEach(cb => {
+                packagingData.other.options.push(cb.nextElementSibling.textContent);
+            });
+            
+            return packagingData;
+        }
+        
+        // 提交申請
+        function submitApplication() {
+            const application = {
+                id: Date.now().toString(),
+                submitDate: new Date().toISOString(),
+                status: 'PENDING',
+                itemCode: document.getElementById('itemCode').value,
+                mainCategory: document.getElementById('mainCategory').value,
+                subCategory: document.getElementById('subCategory').value,
+                specCategory: document.getElementById('specCategory').value,
+                itemNameCN: document.getElementById('itemNameCN').value,
+                itemNameEN: document.getElementById('itemNameEN').value,
+                customerRef: document.getElementById('customerRef').value,
+                supplier: document.getElementById('supplier').value,
+                material: document.getElementById('material').value,
+                surfaceFinish: document.getElementById('surfaceFinish').value,
+                dimensions: {
+                    length: document.getElementById('length').value,
+                    width: document.getElementById('width').value,
+                    height: document.getElementById('height').value,
+                    weight: document.getElementById('weight').value
+                },
+                packaging: collectPackagingData(),
+                applicant: 'Current User' // 實際應用中應從登入資訊取得
+            };
+            
+            // 驗證必填欄位
+            if (!application.itemCode || !application.itemNameCN || !application.itemNameEN || !application.material) {
+                alert('請填寫所有必填欄位！');
+                return;
+            }
+            
+            // 儲存申請
+            applications.push(application);
+            localStorage.setItem('applications', JSON.stringify(applications));
+            
+            alert(`申請已提交！\n申請單號：${application.id}\n料號：${application.itemCode}`);
+            clearForm();
+        }
+        
+        // 清除表單
+        function clearForm() {
+            document.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(field => {
+                field.value = '';
+            });
+            document.querySelectorAll('select').forEach(field => {
+                field.selectedIndex = 0;
+            });
+            document.querySelectorAll('input[type="checkbox"]').forEach(field => {
+                field.checked = false;
+            });
+        }
+        
+        // 載入待審核申請
+        function loadPendingApplications() {
+            const pendingList = document.getElementById('pendingList');
+            pendingList.innerHTML = '';
+            
+            const pending = applications.filter(app => app.status === 'PENDING');
+            
+            pending.forEach(app => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(app.submitDate).toLocaleDateString()}</td>
+                    <td>${app.id}</td>
+                    <td>${app.itemCode}</td>
+                    <td>${app.itemNameCN}</td>
+                    <td>${app.applicant}</td>
+                    <td><span class="status-badge status-pending">待審核</span></td>
+                    <td>
+                        <button class="btn btn-success" onclick="approveApplication('${app.id}')">核准</button>
+                        <button class="btn btn-danger" onclick="rejectApplication('${app.id}')">退回</button>
+                        <button class="btn btn-info" onclick="viewDetails('${app.id}')">詳情</button>
+                    </td>
+                `;
+                pendingList.appendChild(row);
+            });
+        }
+        
+        // 核准申請
+        function approveApplication(id) {
+            const app = applications.find(a => a.id === id);
+            if (app) {
+                app.status = 'APPROVED';
+                app.approvalDate = new Date().toISOString();
+                localStorage.setItem('applications', JSON.stringify(applications));
+                alert('申請已核准！');
+                loadPendingApplications();
+            }
+        }
+        
+        // 退回申請
+        function rejectApplication(id) {
+            const reason = prompt('請輸入退回原因：');
+            if (reason) {
+                const app = applications.find(a => a.id === id);
+                if (app) {
+                    app.status = 'REJECTED';
+                    app.rejectReason = reason;
+                    app.rejectDate = new Date().toISOString();
+                    localStorage.setItem('applications', JSON.stringify(applications));
+                    alert('申請已退回！');
+                    loadPendingApplications();
+                }
+            }
+        }
+        
+        // 查看詳情
+        function viewDetails(id) {
+            const app = applications.find(a => a.id === id);
+            if (app) {
+                const modal = document.getElementById('detailModal');
+                const modalBody = document.getElementById('modalBody');
+                
+                modalBody.innerHTML = `
+                    <div class="form-section">
+                        <h3>基本資訊</h3>
+                        <p><strong>申請單號：</strong>${app.id}</p>
+                        <p><strong>料號：</strong>${app.itemCode}</p>
+                        <p><strong>中文名稱：</strong>${app.itemNameCN}</p>
+                        <p><strong>英文名稱：</strong>${app.itemNameEN}</p>
+                        <p><strong>材質：</strong>${app.material}</p>
+                        <p><strong>表面處理：</strong>${app.surfaceFinish || 'N/A'}</p>
+                    </div>
+                    <div class="form-section">
+                        <h3>包裝說明</h3>
+                        <h4>1. 個別產品包裝</h4>
+                        <p><strong>選項：</strong>${app.packaging.productPackaging.options.join(', ') || 'N/A'}</p>
+                        <p><strong>說明：</strong>${app.packaging.productPackaging.description || 'N/A'}</p>
+                        
+                        <h4>2. 配件內容</h4>
+                        <p><strong>選項：</strong>${app.packaging.accessoriesContent.options.join(', ') || 'N/A'}</p>
+                        <p><strong>說明：</strong>${app.packaging.accessoriesContent.description || 'N/A'}</p>
+                        
+                        <!-- 其他包裝資訊... -->
+                    </div>
+                `;
+                
+                modal.classList.add('active');
+            }
+        }
+        
+        // 關閉Modal
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('active');
+        }
+        
+        // 匯出EXCEL
+        function exportToExcel() {
+            const category = document.getElementById('exportCategory').value;
+            const startDate = document.getElementById('exportStartDate').value;
+            const endDate = document.getElementById('exportEndDate').value;
+            const status = document.getElementById('exportStatus').value;
+            
+            // 篩選資料
+            let filtered = applications;
+            
+            if (category !== 'ALL') {
+                filtered = filtered.filter(app => app.mainCategory === category);
+            }
+            
+            if (status !== 'ALL') {
+                filtered = filtered.filter(app => app.status === status);
+            }
+            
+            if (startDate) {
+                filtered = filtered.filter(app => new Date(app.submitDate) >= new Date(startDate));
+            }
+            
+            if (endDate) {
+                filtered = filtered.filter(app => new Date(app.submitDate) <= new Date(endDate));
+            }
+            
+            // 產生CSV格式（簡化版本）
+            let csv = '料號,料件說明,客戶說明,產品大類,產品中類,產品小類,料件基本材質,料件外型長,料件外型寬,料件外型高,料件外型重量,個別產品包裝,配件內容,配件,內盒,外箱,運輸與托盤要求,裝櫃要求,其他\n';
+            
+            filtered.forEach(app => {
+                csv += `${app.itemCode},`;
+                csv += `"${app.itemNameCN}",`;
+                csv += `"${app.itemNameEN}",`;
+                csv += `${categories[app.mainCategory].name},`;
+                csv += `${app.subCategory},`;
+                csv += `${app.specCategory},`;
+                csv += `${app.material},`;
+                csv += `${app.dimensions.length},`;
+                csv += `${app.dimensions.width},`;
+                csv += `${app.dimensions.height},`;
+                csv += `${app.dimensions.weight},`;
+                csv += `"${app.packaging.productPackaging.description}",`;
+                csv += `"${app.packaging.accessoriesContent.description}",`;
+                csv += `"${app.packaging.accessories.description}",`;
+                csv += `"${app.packaging.innerBox.description}",`;
+                csv += `"${app.packaging.outerBox.description}",`;
+                csv += `"${app.packaging.transport.description}",`;
+                csv += `"${app.packaging.container.description}",`;
+                csv += `"${app.packaging.other.description}"\n`;
+            });
+            
+            // 下載檔案
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `SAP_Material_Export_${category}_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            
+            alert(`已匯出 ${filtered.length} 筆資料！`);
+        }
+        
+        // 儲存設定
+        function saveSettings() {
+            const settings = {
+                serialDigits: document.getElementById('serialDigits').value,
+                autoApprove: document.getElementById('autoApprove').value,
+                emailNotify: document.getElementById('emailNotify').value
+            };
+            
+            localStorage.setItem('systemSettings', JSON.stringify(settings));
+            alert('設定已儲存！');
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 載入設定
+            const settings = JSON.parse(localStorage.getItem('systemSettings') || '{}');
+            if (settings.serialDigits) {
+                document.getElementById('serialDigits').value = settings.serialDigits;
+            }
+            
+            // 設定今天日期為預設值
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('exportEndDate').value = today;
+            
+            // 設定30天前為開始日期
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            document.getElementById('exportStartDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+        });
+    </script>
+</body>
+</html>
