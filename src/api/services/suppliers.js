@@ -10,7 +10,7 @@ import * as supabaseImpl from './supabase/suppliers.js'
 /**
  * 取得當前使用的後端實作
  */
-function getImplementation() {
+function getImplementation () {
   return getBackendType() === 'axios' ? axiosImpl : supabaseImpl
 }
 
@@ -23,7 +23,7 @@ export const suppliersService = {
    * @param {object} filters - 篩選條件
    * @returns {Promise<Array>}
    */
-  async getSuppliers(filters = {}) {
+  async getSuppliers (filters = {}) {
     return getImplementation().getSuppliers(filters)
   },
 
@@ -32,7 +32,7 @@ export const suppliersService = {
    * @param {number|string} id - 供應商 ID 或 code
    * @returns {Promise<Object>}
    */
-  async getSupplier(id) {
+  async getSupplier (id) {
     return getImplementation().getSupplier(id)
   },
 
@@ -41,7 +41,7 @@ export const suppliersService = {
    * @param {object} supplierData - 供應商資料
    * @returns {Promise<Object>}
    */
-  async createSupplier(supplierData) {
+  async createSupplier (supplierData) {
     return getImplementation().createSupplier(supplierData)
   },
 
@@ -51,7 +51,7 @@ export const suppliersService = {
    * @param {object} updates - 更新資料
    * @returns {Promise<Object>}
    */
-  async updateSupplier(id, updates) {
+  async updateSupplier (id, updates) {
     return getImplementation().updateSupplier(id, updates)
   },
 
@@ -60,7 +60,7 @@ export const suppliersService = {
    * @param {number|string} id - 供應商 ID
    * @returns {Promise<void>}
    */
-  async deleteSupplier(id) {
+  async deleteSupplier (id) {
     return getImplementation().deleteSupplier(id)
   },
 }

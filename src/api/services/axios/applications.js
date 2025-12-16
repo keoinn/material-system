@@ -11,7 +11,7 @@ export default {
   /**
    * 取得申請列表
    */
-  async getApplications(filters = {}) {
+  async getApplications (filters = {}) {
     const response = await apiClient.get('/applications', { params: filters })
     return response.data || response
   },
@@ -19,7 +19,7 @@ export default {
   /**
    * 取得單一申請
    */
-  async getApplication(id) {
+  async getApplication (id) {
     const response = await apiClient.get(`/applications/${id}`)
     return response.data || response
   },
@@ -27,7 +27,7 @@ export default {
   /**
    * 建立申請
    */
-  async createApplication(applicationData) {
+  async createApplication (applicationData) {
     const response = await apiClient.post('/applications', applicationData)
     return response.data || response
   },
@@ -35,7 +35,7 @@ export default {
   /**
    * 更新申請
    */
-  async updateApplication(id, updates) {
+  async updateApplication (id, updates) {
     const response = await apiClient.put(`/applications/${id}`, updates)
     return response.data || response
   },
@@ -43,7 +43,7 @@ export default {
   /**
    * 刪除申請
    */
-  async deleteApplication(id) {
+  async deleteApplication (id) {
     await apiClient.delete(`/applications/${id}`)
   },
 }

@@ -2,7 +2,7 @@
  * Attachments API Service - Supabase Implementation
  * 附件相關 API 服務（Supabase 實作）
  */
-import { supabase, storageService, isSupabaseAvailable, STORAGE_BUCKET } from '../../supabase.js'
+import { isSupabaseAvailable, STORAGE_BUCKET, storageService, supabase } from '../../supabase.js'
 
 /**
  * Supabase 實作
@@ -11,7 +11,7 @@ export default {
   /**
    * 取得申請的附件列表
    */
-  async getAttachments(applicationId) {
+  async getAttachments (applicationId) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -32,7 +32,7 @@ export default {
   /**
    * 上傳附件
    */
-  async uploadAttachment(applicationId, file, metadata = {}) {
+  async uploadAttachment (applicationId, file, metadata = {}) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -48,7 +48,7 @@ export default {
       filePath,
       {
         contentType: file.type,
-      }
+      },
     )
 
     if (uploadError) {
@@ -61,7 +61,7 @@ export default {
       fileType = 'image'
     } else if (file.type.includes('pdf') || file.type.includes('document') || file.type.includes('word')) {
       fileType = 'document'
-    } else if (file.type.includes('dwg') || file.type.includes('dxf') || file.name.match(/\.(dwg|dxf)$/i)) {
+    } else if (file.type.includes('dwg') || file.type.includes('dxf') || /\.(dwg|dxf)$/i.test(file.name)) {
       fileType = 'drawing'
     }
 
@@ -105,7 +105,7 @@ export default {
   /**
    * 刪除附件
    */
-  async deleteAttachment(attachmentId) {
+  async deleteAttachment (attachmentId) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -145,7 +145,7 @@ export default {
   /**
    * 取得附件下載 URL
    */
-  async getAttachmentUrl(attachmentId, expiresIn = 3600) {
+  async getAttachmentUrl (attachmentId, expiresIn = 3600) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }

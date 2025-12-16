@@ -41,7 +41,7 @@ export const storageService = {
    * @param {object} options - 上傳選項
    * @returns {Promise<{data: object, error: object}>}
    */
-  async uploadFile(file, path, options = {}) {
+  async uploadFile (file, path, options = {}) {
     if (!supabase) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -84,7 +84,7 @@ export const storageService = {
    * @param {string} path - 檔案路徑
    * @returns {Promise<{data: object, error: object}>}
    */
-  async deleteFile(path) {
+  async deleteFile (path) {
     if (!supabase) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -101,7 +101,7 @@ export const storageService = {
    * @param {string} path - 檔案路徑
    * @returns {string} 公開 URL
    */
-  getPublicUrl(path) {
+  getPublicUrl (path) {
     if (!supabase) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -119,7 +119,7 @@ export const storageService = {
    * @param {number} expiresIn - 過期時間（秒）
    * @returns {Promise<string>} 簽名 URL
    */
-  async getSignedUrl(path, expiresIn = 3600) {
+  async getSignedUrl (path, expiresIn = 3600) {
     if (!supabase) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -141,7 +141,7 @@ export const storageService = {
    * @param {object} options - 選項
    * @returns {Promise<{data: array, error: object}>}
    */
-  async listFiles(folder = '', options = {}) {
+  async listFiles (folder = '', options = {}) {
     if (!supabase) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -167,7 +167,7 @@ export const storageService = {
 /**
  * 檢查 Supabase 是否可用
  */
-export function isSupabaseAvailable() {
+export function isSupabaseAvailable () {
   return supabase !== null
 }
 

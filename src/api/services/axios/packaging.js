@@ -11,7 +11,7 @@ export default {
   /**
    * 取得所有包裝類別
    */
-  async getPackagingCategories() {
+  async getPackagingCategories () {
     const response = await apiClient.get('/packaging/categories')
     return response.data || response
   },
@@ -19,7 +19,7 @@ export default {
   /**
    * 取得包裝選項（根據類別）
    */
-  async getPackagingOptions(categoryId) {
+  async getPackagingOptions (categoryId) {
     const response = await apiClient.get(`/packaging/options/${categoryId}`)
     return response.data || response
   },
@@ -27,7 +27,7 @@ export default {
   /**
    * 取得所有包裝選項（依類別分組）
    */
-  async getAllPackagingOptions() {
+  async getAllPackagingOptions () {
     const response = await apiClient.get('/packaging/options')
     return response.data || response
   },
@@ -35,7 +35,7 @@ export default {
   /**
    * 取得類別預設包裝選項
    */
-  async getCategoryDefaults(mainCategoryCode) {
+  async getCategoryDefaults (mainCategoryCode) {
     const response = await apiClient.get(`/packaging/defaults/${mainCategoryCode}`)
     return response.data || response
   },
@@ -43,7 +43,7 @@ export default {
   /**
    * 取得申請的包裝選項
    */
-  async getApplicationPackaging(applicationId) {
+  async getApplicationPackaging (applicationId) {
     const response = await apiClient.get(`/applications/${applicationId}/packaging`)
     return response.data || response
   },
@@ -51,7 +51,7 @@ export default {
   /**
    * 儲存申請的包裝選項
    */
-  async saveApplicationPackaging(applicationId, packagingData) {
+  async saveApplicationPackaging (applicationId, packagingData) {
     const response = await apiClient.post(`/applications/${applicationId}/packaging`, {
       packaging: packagingData,
     })

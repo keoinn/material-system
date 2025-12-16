@@ -34,9 +34,21 @@ router.isReady().then(() => {
   localStorage.removeItem('vuetify:dynamic-reload')
 })
 
+// 不需要認證的頁面路徑
+const publicPaths = ['/login', '/testing']
+
 // 路由守衛
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
+
+  // 檢查是否為公開頁面
+  const isPublicPath = publicPaths.some(path => to.path.startsWith(path))
+
+  // 如果是公開頁面，直接允許訪問
+  if (isPublicPath) {
+    next()
+    return
+  }
 
   // 檢查認證狀態
   const isAuthenticated = authStore.checkAuth()
@@ -49,7 +61,7 @@ router.beforeEach((to, from, next) => {
 
   // 如果需要認證的頁面但未登入，重導向到登入頁面
   // 確保清除任何殘留的認證狀態
-  if (to.path !== '/login' && !isAuthenticated) {
+  if (!isPublicPath && !isAuthenticated) {
     // 確保清除狀態
     if (authStore.user || authStore.isAuthenticated) {
       authStore.logout()

@@ -10,7 +10,7 @@ import * as supabaseImpl from './supabase/attachments.js'
 /**
  * 取得當前使用的後端實作
  */
-function getImplementation() {
+function getImplementation () {
   return getBackendType() === 'axios' ? axiosImpl : supabaseImpl
 }
 
@@ -23,7 +23,7 @@ export const attachmentsService = {
    * @param {number|string} applicationId - 申請 ID
    * @returns {Promise<Array>}
    */
-  async getAttachments(applicationId) {
+  async getAttachments (applicationId) {
     return getImplementation().getAttachments(applicationId)
   },
 
@@ -34,7 +34,7 @@ export const attachmentsService = {
    * @param {object} metadata - 檔案元資料
    * @returns {Promise<Object>}
    */
-  async uploadAttachment(applicationId, file, metadata = {}) {
+  async uploadAttachment (applicationId, file, metadata = {}) {
     return getImplementation().uploadAttachment(applicationId, file, metadata)
   },
 
@@ -43,7 +43,7 @@ export const attachmentsService = {
    * @param {number|string} attachmentId - 附件 ID
    * @returns {Promise<void>}
    */
-  async deleteAttachment(attachmentId) {
+  async deleteAttachment (attachmentId) {
     return getImplementation().deleteAttachment(attachmentId)
   },
 
@@ -53,7 +53,7 @@ export const attachmentsService = {
    * @param {number} expiresIn - 過期時間（秒，預設 3600）
    * @returns {Promise<string>}
    */
-  async getAttachmentUrl(attachmentId, expiresIn = 3600) {
+  async getAttachmentUrl (attachmentId, expiresIn = 3600) {
     return getImplementation().getAttachmentUrl(attachmentId, expiresIn)
   },
 }

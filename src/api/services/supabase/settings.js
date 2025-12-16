@@ -2,7 +2,7 @@
  * Settings API Service - Supabase Implementation
  * 系統設定相關 API 服務（Supabase 實作）
  */
-import { supabase, isSupabaseAvailable } from '../../supabase.js'
+import { isSupabaseAvailable, supabase } from '../../supabase.js'
 
 /**
  * Supabase 實作
@@ -11,7 +11,7 @@ export default {
   /**
    * 取得所有系統設定
    */
-  async getSettings() {
+  async getSettings () {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -27,30 +27,34 @@ export default {
 
     // 轉換為物件格式
     const settings = {}
-    data.forEach(item => {
+    for (const item of data) {
       let value = item.setting_value
-      
+
       // 根據類型轉換值
       switch (item.setting_type) {
-        case 'number':
+        case 'number': {
           value = Number(value)
           break
-        case 'boolean':
+        }
+        case 'boolean': {
           value = value === 'true' || value === true
           break
-        case 'json':
+        }
+        case 'json': {
           try {
             value = JSON.parse(value)
-          } catch (e) {
+          } catch {
             value = value
           }
           break
-        default:
+        }
+        default: {
           value = value
+        }
       }
-      
+
       settings[item.setting_key] = value
-    })
+    }
 
     return settings
   },
@@ -58,7 +62,7 @@ export default {
   /**
    * 取得單一設定值
    */
-  async getSetting(key) {
+  async getSetting (key) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -80,19 +84,22 @@ export default {
     // 根據類型轉換值
     let value = data.setting_value
     switch (data.setting_type) {
-      case 'number':
+      case 'number': {
         value = Number(value)
         break
-      case 'boolean':
+      }
+      case 'boolean': {
         value = value === 'true' || value === true
         break
-      case 'json':
+      }
+      case 'json': {
         try {
           value = JSON.parse(value)
-        } catch (e) {
+        } catch {
           value = value
         }
         break
+      }
     }
 
     return value
@@ -101,7 +108,7 @@ export default {
   /**
    * 更新設定值
    */
-  async updateSetting(key, value, type = null) {
+  async updateSetting (key, value, type = null) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -150,7 +157,7 @@ export default {
   /**
    * 批量更新設定
    */
-  async updateSettings(settings) {
+  async updateSettings (settings) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }

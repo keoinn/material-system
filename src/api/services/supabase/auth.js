@@ -2,7 +2,7 @@
  * Auth API Service - Supabase Implementation
  * 認證相關 API 服務（Supabase 實作）
  */
-import { supabase, isSupabaseAvailable } from '../../supabase.js'
+import { isSupabaseAvailable, supabase } from '../../supabase.js'
 
 /**
  * Supabase 實作
@@ -11,7 +11,7 @@ export default {
   /**
    * 登入
    */
-  async login(email, password) {
+  async login (email, password) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -39,7 +39,7 @@ export default {
   /**
    * 登出
    */
-  async logout() {
+  async logout () {
     if (!isSupabaseAvailable()) {
       localStorage.removeItem('supabase.auth.token')
       return
@@ -57,7 +57,7 @@ export default {
   /**
    * 取得當前使用者
    */
-  async getCurrentUser() {
+  async getCurrentUser () {
     if (!isSupabaseAvailable()) {
       return null
     }
@@ -74,7 +74,7 @@ export default {
   /**
    * 取得當前 Session
    */
-  async getSession() {
+  async getSession () {
     if (!isSupabaseAvailable()) {
       return null
     }
@@ -91,7 +91,7 @@ export default {
   /**
    * 註冊新使用者
    */
-  async signUp(userData) {
+  async signUp (userData) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -117,7 +117,7 @@ export default {
   /**
    * 重設密碼
    */
-  async resetPassword(email) {
+  async resetPassword (email) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }

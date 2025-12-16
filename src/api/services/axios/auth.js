@@ -11,7 +11,7 @@ export default {
   /**
    * 登入
    */
-  async login(email, password) {
+  async login (email, password) {
     const response = await apiClient.post('/auth/login', { email, password })
     // 儲存 token
     if (response.token) {
@@ -23,7 +23,7 @@ export default {
   /**
    * 登出
    */
-  async logout() {
+  async logout () {
     await apiClient.post('/auth/logout')
     localStorage.removeItem('auth_token')
   },
@@ -31,11 +31,11 @@ export default {
   /**
    * 取得當前使用者
    */
-  async getCurrentUser() {
+  async getCurrentUser () {
     try {
       const response = await apiClient.get('/auth/me')
       return response.user || response
-    } catch (error) {
+    } catch {
       return null
     }
   },
@@ -43,7 +43,7 @@ export default {
   /**
    * 取得當前 Session
    */
-  async getSession() {
+  async getSession () {
     const token = localStorage.getItem('auth_token')
     return token ? { access_token: token } : null
   },
@@ -51,7 +51,7 @@ export default {
   /**
    * 註冊新使用者
    */
-  async signUp(userData) {
+  async signUp (userData) {
     const response = await apiClient.post('/auth/signup', userData)
     return response
   },
@@ -59,7 +59,7 @@ export default {
   /**
    * 重設密碼
    */
-  async resetPassword(email) {
+  async resetPassword (email) {
     await apiClient.post('/auth/reset-password', { email })
   },
 }

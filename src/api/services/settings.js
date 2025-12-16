@@ -10,7 +10,7 @@ import * as supabaseImpl from './supabase/settings.js'
 /**
  * 取得當前使用的後端實作
  */
-function getImplementation() {
+function getImplementation () {
   return getBackendType() === 'axios' ? axiosImpl : supabaseImpl
 }
 
@@ -22,7 +22,7 @@ export const settingsService = {
    * 取得所有系統設定
    * @returns {Promise<Object>}
    */
-  async getSettings() {
+  async getSettings () {
     return getImplementation().getSettings()
   },
 
@@ -31,7 +31,7 @@ export const settingsService = {
    * @param {string} key - 設定鍵值
    * @returns {Promise<any>}
    */
-  async getSetting(key) {
+  async getSetting (key) {
     return getImplementation().getSetting(key)
   },
 
@@ -42,7 +42,7 @@ export const settingsService = {
    * @param {string} type - 設定類型（可選）
    * @returns {Promise<Object>}
    */
-  async updateSetting(key, value, type = null) {
+  async updateSetting (key, value, type = null) {
     return getImplementation().updateSetting(key, value, type)
   },
 
@@ -51,7 +51,7 @@ export const settingsService = {
    * @param {Object} settings - 設定物件
    * @returns {Promise<Array>}
    */
-  async updateSettings(settings) {
+  async updateSettings (settings) {
     return getImplementation().updateSettings(settings)
   },
 }

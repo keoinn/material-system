@@ -10,7 +10,7 @@ import * as supabaseImpl from './supabase/auth.js'
 /**
  * 取得當前使用的後端實作
  */
-function getImplementation() {
+function getImplementation () {
   return getBackendType() === 'axios' ? axiosImpl : supabaseImpl
 }
 
@@ -24,7 +24,7 @@ export const authService = {
    * @param {string} password - 密碼
    * @returns {Promise<Object>}
    */
-  async login(email, password) {
+  async login (email, password) {
     return getImplementation().login(email, password)
   },
 
@@ -32,7 +32,7 @@ export const authService = {
    * 登出
    * @returns {Promise<void>}
    */
-  async logout() {
+  async logout () {
     return getImplementation().logout()
   },
 
@@ -40,7 +40,7 @@ export const authService = {
    * 取得當前使用者
    * @returns {Promise<Object|null>}
    */
-  async getCurrentUser() {
+  async getCurrentUser () {
     return getImplementation().getCurrentUser()
   },
 
@@ -48,7 +48,7 @@ export const authService = {
    * 取得當前 Session
    * @returns {Promise<Object|null>}
    */
-  async getSession() {
+  async getSession () {
     return getImplementation().getSession()
   },
 
@@ -57,7 +57,7 @@ export const authService = {
    * @param {object} userData - 使用者資料
    * @returns {Promise<Object>}
    */
-  async signUp(userData) {
+  async signUp (userData) {
     return getImplementation().signUp(userData)
   },
 
@@ -66,7 +66,7 @@ export const authService = {
    * @param {string} email - Email
    * @returns {Promise<void>}
    */
-  async resetPassword(email) {
+  async resetPassword (email) {
     return getImplementation().resetPassword(email)
   },
 }

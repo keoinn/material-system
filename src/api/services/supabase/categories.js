@@ -2,7 +2,7 @@
  * Categories API Service - Supabase Implementation
  * 產品分類相關 API 服務（Supabase 實作）
  */
-import { supabase, isSupabaseAvailable } from '../../supabase.js'
+import { isSupabaseAvailable, supabase } from '../../supabase.js'
 
 /**
  * Supabase 實作
@@ -11,7 +11,7 @@ export default {
   /**
    * 取得所有大類
    */
-  async getMainCategories() {
+  async getMainCategories () {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -33,7 +33,7 @@ export default {
   /**
    * 取得中類（根據大類）
    */
-  async getSubCategories(mainCategoryCode) {
+  async getSubCategories (mainCategoryCode) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -68,7 +68,7 @@ export default {
   /**
    * 取得小類（根據大類）
    */
-  async getSpecCategories(mainCategoryCode) {
+  async getSpecCategories (mainCategoryCode) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -91,7 +91,7 @@ export default {
   /**
    * 取得完整分類樹（大類、中類、小類）
    */
-  async getCategoryTree() {
+  async getCategoryTree () {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -113,7 +113,7 @@ export default {
     const subCategories = data.filter(cat => cat.level === 2)
     const specCategories = data.filter(cat => cat.level === 3)
 
-    mainCategories.forEach(main => {
+    for (const main of mainCategories) {
       tree[main.code] = {
         ...main,
         subCategories: subCategories
@@ -131,7 +131,7 @@ export default {
             return acc
           }, {}),
       }
-    })
+    }
 
     return tree
   },

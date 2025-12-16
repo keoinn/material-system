@@ -11,7 +11,7 @@ export default {
   /**
    * 取得所有系統設定
    */
-  async getSettings() {
+  async getSettings () {
     const response = await apiClient.get('/settings')
     return response.data || response
   },
@@ -19,7 +19,7 @@ export default {
   /**
    * 取得單一設定值
    */
-  async getSetting(key) {
+  async getSetting (key) {
     const response = await apiClient.get(`/settings/${key}`)
     return response.value || response
   },
@@ -27,7 +27,7 @@ export default {
   /**
    * 更新設定值
    */
-  async updateSetting(key, value, type = null) {
+  async updateSetting (key, value, type = null) {
     const response = await apiClient.put(`/settings/${key}`, { value, type })
     return response.data || response
   },
@@ -35,7 +35,7 @@ export default {
   /**
    * 批量更新設定
    */
-  async updateSettings(settings) {
+  async updateSettings (settings) {
     const response = await apiClient.put('/settings', settings)
     return response.data || response
   },

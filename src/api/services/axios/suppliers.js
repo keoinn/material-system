@@ -11,7 +11,7 @@ export default {
   /**
    * 取得所有供應商
    */
-  async getSuppliers(filters = {}) {
+  async getSuppliers (filters = {}) {
     const response = await apiClient.get('/suppliers', { params: filters })
     return response.data || response
   },
@@ -19,7 +19,7 @@ export default {
   /**
    * 取得單一供應商
    */
-  async getSupplier(id) {
+  async getSupplier (id) {
     const response = await apiClient.get(`/suppliers/${id}`)
     return response.data || response
   },
@@ -27,7 +27,7 @@ export default {
   /**
    * 建立供應商
    */
-  async createSupplier(supplierData) {
+  async createSupplier (supplierData) {
     const response = await apiClient.post('/suppliers', supplierData)
     return response.data || response
   },
@@ -35,7 +35,7 @@ export default {
   /**
    * 更新供應商
    */
-  async updateSupplier(id, updates) {
+  async updateSupplier (id, updates) {
     const response = await apiClient.put(`/suppliers/${id}`, updates)
     return response.data || response
   },
@@ -43,7 +43,7 @@ export default {
   /**
    * 刪除供應商
    */
-  async deleteSupplier(id) {
+  async deleteSupplier (id) {
     await apiClient.delete(`/suppliers/${id}`)
   },
 }

@@ -10,7 +10,7 @@ import * as supabaseImpl from './supabase/categories.js'
 /**
  * 取得當前使用的後端實作
  */
-function getImplementation() {
+function getImplementation () {
   return getBackendType() === 'axios' ? axiosImpl : supabaseImpl
 }
 
@@ -22,7 +22,7 @@ export const categoriesService = {
    * 取得所有大類
    * @returns {Promise<Array>}
    */
-  async getMainCategories() {
+  async getMainCategories () {
     return getImplementation().getMainCategories()
   },
 
@@ -31,7 +31,7 @@ export const categoriesService = {
    * @param {string} mainCategoryCode - 大類代碼
    * @returns {Promise<Array>}
    */
-  async getSubCategories(mainCategoryCode) {
+  async getSubCategories (mainCategoryCode) {
     return getImplementation().getSubCategories(mainCategoryCode)
   },
 
@@ -40,7 +40,7 @@ export const categoriesService = {
    * @param {string} mainCategoryCode - 大類代碼
    * @returns {Promise<Array>}
    */
-  async getSpecCategories(mainCategoryCode) {
+  async getSpecCategories (mainCategoryCode) {
     return getImplementation().getSpecCategories(mainCategoryCode)
   },
 
@@ -48,7 +48,7 @@ export const categoriesService = {
    * 取得完整分類樹（大類、中類、小類）
    * @returns {Promise<Object>}
    */
-  async getCategoryTree() {
+  async getCategoryTree () {
     return getImplementation().getCategoryTree()
   },
 }

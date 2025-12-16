@@ -15,53 +15,53 @@ meta:
             </div>
 
             <v-card-text>
-            <v-form @submit.prevent="handleLogin">
-              <v-text-field
-                v-model="username"
-                class="mb-4"
-                label="使用者名稱"
-                prepend-inner-icon="mdi-account"
-                :rules="[rules.required]"
-                variant="outlined"
-              />
+              <v-form @submit.prevent="handleLogin">
+                <v-text-field
+                  v-model="username"
+                  class="mb-4"
+                  label="使用者名稱"
+                  prepend-inner-icon="mdi-account"
+                  :rules="[rules.required]"
+                  variant="outlined"
+                />
 
-              <v-text-field
-                v-model="password"
-                class="mb-4"
-                label="密碼"
-                prepend-inner-icon="mdi-lock"
-                :rules="[rules.required]"
-                type="password"
-                variant="outlined"
-              />
+                <v-text-field
+                  v-model="password"
+                  class="mb-4"
+                  label="密碼"
+                  prepend-inner-icon="mdi-lock"
+                  :rules="[rules.required]"
+                  type="password"
+                  variant="outlined"
+                />
 
-              <v-alert
-                v-if="errorMessage"
-                class="mb-4"
-                type="error"
-                variant="tonal"
-              >
-                {{ errorMessage }}
-              </v-alert>
+                <v-alert
+                  v-if="errorMessage"
+                  class="mb-4"
+                  type="error"
+                  variant="tonal"
+                >
+                  {{ errorMessage }}
+                </v-alert>
 
-              <v-btn
-                block
-                class="login-btn"
-                color="primary"
-                :loading="loading"
-                size="large"
-                type="submit"
-              >
-                登入
-              </v-btn>
-            </v-form>
+                <v-btn
+                  block
+                  class="login-btn"
+                  color="primary"
+                  :loading="loading"
+                  size="large"
+                  type="submit"
+                >
+                  登入
+                </v-btn>
+              </v-form>
 
-            <div class="mt-4 text-center">
-              <small class="text-grey">
-                提示：可使用 admin 或 user 登入（開發模式）
-              </small>
-            </div>
-          </v-card-text>
+              <div class="mt-4 text-center">
+                <small class="text-grey">
+                  提示：可使用 admin 或 user 登入（開發模式）
+                </small>
+              </div>
+            </v-card-text>
           </v-card>
         </v-col>
       </v-row>
@@ -130,13 +130,13 @@ meta:
   align-items: center;
   justify-content: center;
   padding: 16px;
-  
+
   :deep(.v-row) {
     margin: 0;
     width: 100%;
     height: 100%;
   }
-  
+
   :deep(.v-col) {
     padding: 0;
     display: flex;

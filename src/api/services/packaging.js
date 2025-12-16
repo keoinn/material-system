@@ -10,7 +10,7 @@ import * as supabaseImpl from './supabase/packaging.js'
 /**
  * 取得當前使用的後端實作
  */
-function getImplementation() {
+function getImplementation () {
   return getBackendType() === 'axios' ? axiosImpl : supabaseImpl
 }
 
@@ -22,7 +22,7 @@ export const packagingService = {
    * 取得所有包裝類別
    * @returns {Promise<Array>}
    */
-  async getPackagingCategories() {
+  async getPackagingCategories () {
     return getImplementation().getPackagingCategories()
   },
 
@@ -31,7 +31,7 @@ export const packagingService = {
    * @param {string|number} categoryId - 類別 ID 或 code
    * @returns {Promise<Array>}
    */
-  async getPackagingOptions(categoryId) {
+  async getPackagingOptions (categoryId) {
     return getImplementation().getPackagingOptions(categoryId)
   },
 
@@ -39,7 +39,7 @@ export const packagingService = {
    * 取得所有包裝選項（依類別分組）
    * @returns {Promise<Object>}
    */
-  async getAllPackagingOptions() {
+  async getAllPackagingOptions () {
     return getImplementation().getAllPackagingOptions()
   },
 
@@ -48,7 +48,7 @@ export const packagingService = {
    * @param {string} mainCategoryCode - 產品大類代碼
    * @returns {Promise<Object>}
    */
-  async getCategoryDefaults(mainCategoryCode) {
+  async getCategoryDefaults (mainCategoryCode) {
     return getImplementation().getCategoryDefaults(mainCategoryCode)
   },
 
@@ -57,7 +57,7 @@ export const packagingService = {
    * @param {number|string} applicationId - 申請 ID
    * @returns {Promise<Array>}
    */
-  async getApplicationPackaging(applicationId) {
+  async getApplicationPackaging (applicationId) {
     return getImplementation().getApplicationPackaging(applicationId)
   },
 
@@ -67,7 +67,7 @@ export const packagingService = {
    * @param {Array} packagingData - 包裝資料陣列
    * @returns {Promise<Array>}
    */
-  async saveApplicationPackaging(applicationId, packagingData) {
+  async saveApplicationPackaging (applicationId, packagingData) {
     return getImplementation().saveApplicationPackaging(applicationId, packagingData)
   },
 }

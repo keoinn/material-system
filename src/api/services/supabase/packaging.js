@@ -2,7 +2,7 @@
  * Packaging API Service - Supabase Implementation
  * 包裝相關 API 服務（Supabase 實作）
  */
-import { supabase, isSupabaseAvailable } from '../../supabase.js'
+import { isSupabaseAvailable, supabase } from '../../supabase.js'
 
 /**
  * Supabase 實作
@@ -11,7 +11,7 @@ export default {
   /**
    * 取得所有包裝類別
    */
-  async getPackagingCategories() {
+  async getPackagingCategories () {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -32,14 +32,14 @@ export default {
   /**
    * 取得包裝選項（根據類別）
    */
-  async getPackagingOptions(categoryId) {
+  async getPackagingOptions (categoryId) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
 
     // 如果傳入的是 code，先查詢 ID
     let categoryIdValue = categoryId
-    if (typeof categoryId === 'string' && !categoryId.match(/^\d+$/)) {
+    if (typeof categoryId === 'string' && !/^\d+$/.test(categoryId)) {
       const { data: category } = await supabase
         .from('packaging_categories')
         .select('id')
@@ -69,7 +69,7 @@ export default {
   /**
    * 取得所有包裝選項（依類別分組）
    */
-  async getAllPackagingOptions() {
+  async getAllPackagingOptions () {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -94,7 +94,7 @@ export default {
 
     // 依類別分組
     const grouped = {}
-    data.forEach(option => {
+    for (const option of data) {
       const categoryCode = option.packaging_categories?.code || 'unknown'
       if (!grouped[categoryCode]) {
         grouped[categoryCode] = {
@@ -103,7 +103,7 @@ export default {
         }
       }
       grouped[categoryCode].options.push(option)
-    })
+    }
 
     return grouped
   },
@@ -111,7 +111,7 @@ export default {
   /**
    * 取得類別預設包裝選項
    */
-  async getCategoryDefaults(mainCategoryCode) {
+  async getCategoryDefaults (mainCategoryCode) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -141,13 +141,13 @@ export default {
 
     // 組織成物件格式
     const defaults = {}
-    data.forEach(item => {
+    for (const item of data) {
       const categoryCode = item.packaging_categories?.code
       if (!defaults[categoryCode]) {
         defaults[categoryCode] = []
       }
       defaults[categoryCode].push(item.packaging_options?.code)
-    })
+    }
 
     return defaults
   },
@@ -155,7 +155,7 @@ export default {
   /**
    * 取得申請的包裝選項
    */
-  async getApplicationPackaging(applicationId) {
+  async getApplicationPackaging (applicationId) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -189,7 +189,7 @@ export default {
   /**
    * 儲存申請的包裝選項
    */
-  async saveApplicationPackaging(applicationId, packagingData) {
+  async saveApplicationPackaging (applicationId, packagingData) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }

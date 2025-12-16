@@ -9,9 +9,9 @@ import { getBackendType } from '../client.js'
  * @param {string} serviceName - 服務名稱（例如：'applications', 'auth'）
  * @returns {Promise<Object>} 後端實作物件
  */
-export async function getBackendImplementation(serviceName) {
+export async function getBackendImplementation (serviceName) {
   const backendType = getBackendType()
-  
+
   if (backendType === 'axios') {
     const axiosImpl = await import(`./axios/${serviceName}.js`)
     return axiosImpl.default || axiosImpl
@@ -26,9 +26,9 @@ export async function getBackendImplementation(serviceName) {
  * @param {string} serviceName - 服務名稱
  * @returns {Object} 後端實作物件
  */
-export function getBackendImplementationSync(serviceName) {
+export function getBackendImplementationSync (serviceName) {
   const backendType = getBackendType()
-  
+
   if (backendType === 'axios') {
     // 使用動態 import 的同步版本
     return require(`./axios/${serviceName}.js`)

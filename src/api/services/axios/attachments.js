@@ -11,7 +11,7 @@ export default {
   /**
    * 取得申請的附件列表
    */
-  async getAttachments(applicationId) {
+  async getAttachments (applicationId) {
     const response = await apiClient.get(`/applications/${applicationId}/attachments`)
     return response.data || response
   },
@@ -19,7 +19,7 @@ export default {
   /**
    * 上傳附件
    */
-  async uploadAttachment(applicationId, file, metadata = {}) {
+  async uploadAttachment (applicationId, file, metadata = {}) {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('applicationId', applicationId)
@@ -38,14 +38,14 @@ export default {
   /**
    * 刪除附件
    */
-  async deleteAttachment(attachmentId) {
+  async deleteAttachment (attachmentId) {
     await apiClient.delete(`/attachments/${attachmentId}`)
   },
 
   /**
    * 取得附件下載 URL
    */
-  async getAttachmentUrl(attachmentId, expiresIn = 3600) {
+  async getAttachmentUrl (attachmentId, expiresIn = 3600) {
     const response = await apiClient.get(`/attachments/${attachmentId}/url`, {
       params: { expiresIn },
     })

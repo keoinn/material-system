@@ -2,7 +2,7 @@
  * Applications API Service - Supabase Implementation
  * 申請相關 API 服務（Supabase 實作）
  */
-import { supabase, isSupabaseAvailable } from '../../supabase.js'
+import { isSupabaseAvailable, supabase } from '../../supabase.js'
 
 /**
  * Supabase 實作
@@ -11,7 +11,7 @@ export default {
   /**
    * 取得申請列表
    */
-  async getApplications(filters = {}) {
+  async getApplications (filters = {}) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -60,7 +60,7 @@ export default {
   /**
    * 取得單一申請
    */
-  async getApplication(id) {
+  async getApplication (id) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -81,7 +81,7 @@ export default {
   /**
    * 建立申請
    */
-  async createApplication(applicationData) {
+  async createApplication (applicationData) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -102,7 +102,7 @@ export default {
   /**
    * 更新申請
    */
-  async updateApplication(id, updates) {
+  async updateApplication (id, updates) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
@@ -124,7 +124,7 @@ export default {
   /**
    * 刪除申請
    */
-  async deleteApplication(id) {
+  async deleteApplication (id) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
