@@ -220,5 +220,105 @@ export default {
 
     return data || []
   },
-}
 
+  /**
+   * 儲存類別預設包裝模板
+   * @param {string} mainCategoryCode - 產品大類代碼
+   * @param {Object} templateData - 模板資料 { categoryCode: [optionCode, ...] }
+   * @returns {Promise<Array>}
+   */
+  async saveCategoryDefaults (mainCategoryCode, templateData) {
+    if (!isSupabaseAvailable()) {
+      throw new Error('Supabase 客戶端未初始化')
+    }
+
+    // 先刪除該類別的所有預設值
+    const { error: deleteError } = await supabase
+      .from('category_packaging_defaults')
+      .delete()
+      .eq('main_category_code', mainCategoryCode)
+
+    if (deleteError) {
+      throw deleteError
+    }
+
+    // 準備插入資料
+    const insertData = []
+    for (const [categoryCode, optionCodes] of Object.entries(templateData)) {
+      if (!Array.isArray(optionCodes) || optionCodes.length === 0) {
+        continue
+      }
+
+      // 取得包裝類別 ID
+      const { data: category } = await supabase
+        .from('packaging_categories')
+        .select('id')
+        .eq('code', categoryCode)
+        .single()
+
+      if (!category) {
+        console.warn(`找不到包裝類別: ${categoryCode}`)
+        continue
+      }
+
+      // 為每個選項建立記錄
+      for (const [index, optionCode] of optionCodes.entries()) {
+        // 取得包裝選項 ID
+        const { data: option } = await supabase
+          .from('packaging_options')
+          .select('id')
+          .eq('code', optionCode)
+          .eq('category_id', category.id)
+          .single()
+
+        if (!option) {
+          console.warn(`找不到包裝選項: ${optionCode} (類別: ${categoryCode})`)
+          continue
+        }
+
+        insertData.push({
+          main_category_code: mainCategoryCode,
+          packaging_category_id: category.id,
+          packaging_option_id: option.id,
+          display_order: index + 1,
+        })
+      }
+    }
+
+    // 批量插入
+    if (insertData.length > 0) {
+      const { data, error } = await supabase
+        .from('category_packaging_defaults')
+        .insert(insertData)
+        .select()
+
+      if (error) {
+        throw error
+      }
+
+      return data || []
+    }
+
+    return []
+  },
+
+  /**
+   * 刪除類別預設包裝模板
+   * @param {string} mainCategoryCode - 產品大類代碼
+   * @returns {Promise<void>}
+   */
+  async deleteCategoryDefaults (mainCategoryCode) {
+    if (!isSupabaseAvailable()) {
+      throw new Error('Supabase 客戶端未初始化')
+    }
+
+    const { error } = await supabase
+      .from('category_packaging_defaults')
+      .delete()
+      .eq('main_category_code', mainCategoryCode)
+
+    if (error) {
+      throw error
+    }
+  },
+}

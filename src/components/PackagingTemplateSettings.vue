@@ -7,6 +7,13 @@
     <v-card-text class="pt-6">
       <p class="mb-4">在此設定各類別的預設勾選項目和說明模板</p>
 
+      <v-progress-linear
+        v-if="packagingStore.loading"
+        class="mb-4"
+        color="primary"
+        indeterminate
+      />
+
       <v-row>
         <v-col cols="12" md="4">
           <v-select
@@ -38,7 +45,7 @@
               selected-class="text-primary"
             >
               <v-chip
-                v-for="option in options"
+                v-for="option in (options || [])"
                 :key="option"
                 filter
                 :value="option"
@@ -47,12 +54,17 @@
                 {{ option }}
               </v-chip>
             </v-chip-group>
+            <p v-if="!options || options.length === 0" class="text-grey text-caption">
+              暫無選項
+            </p>
           </div>
         </div>
 
         <div class="d-flex justify-center gap-4 mt-4">
           <v-btn
             color="primary"
+            :disabled="loading"
+            :loading="loading"
             size="large"
             @click="saveTemplate"
           >
@@ -60,6 +72,7 @@
           </v-btn>
           <v-btn
             color="grey"
+            :disabled="loading"
             size="large"
             @click="resetTemplate"
           >
@@ -72,16 +85,19 @@
 </template>
 
 <script setup>
-  import { reactive, ref } from 'vue'
+  import { onMounted, reactive, ref } from 'vue'
+  import { storeToRefs } from 'pinia'
   import { useSwal } from '@/composables/useSwal'
   import { usePackagingStore } from '@/stores/packaging'
 
   const swal = useSwal()
 
   const packagingStore = usePackagingStore()
+  const { packagingOptions } = storeToRefs(packagingStore)
 
   const selectedCategory = ref('')
   const template = reactive({})
+  const loading = ref(false)
 
   const categoryOptions = [
     { title: 'H - Handle (把手)', value: 'H' },
@@ -93,8 +109,6 @@
     { title: 'I - Industrial Parts Solution (工業零件)', value: 'I' },
     { title: 'O - Others (其他)', value: 'O' },
   ]
-
-  const packagingOptions = packagingStore.packagingOptions
 
   function getSectionName (key) {
     const names = {
@@ -110,17 +124,26 @@
     return names[key] || key
   }
 
-  function loadTemplate () {
+  async function loadTemplate () {
     if (!selectedCategory.value) {
       for (const key of Object.keys(template)) delete template[key]
       return
     }
 
-    const savedTemplate = packagingStore.getTemplate(selectedCategory.value)
-    const defaults = packagingStore.getDefaultOptions(selectedCategory.value)
+    loading.value = true
+    try {
+      // 從 Supabase 載入模板
+      const defaults = await packagingStore.getDefaultOptions(selectedCategory.value)
 
-    for (const key of Object.keys(packagingOptions)) {
-      template[key] = savedTemplate[key] || defaults[key] || []
+      // 初始化所有類別
+      for (const key of Object.keys(packagingOptions.value)) {
+        template[key] = defaults[key] || []
+      }
+    } catch (error) {
+      console.error('載入模板失敗', error)
+      await swal.error('載入模板失敗，請稍後再試')
+    } finally {
+      loading.value = false
     }
   }
 
@@ -130,13 +153,21 @@
       return
     }
 
-    const templateData = {}
-    for (const key of Object.keys(packagingOptions)) {
-      templateData[key] = template[key] || []
-    }
+    loading.value = true
+    try {
+      const templateData = {}
+      for (const key of Object.keys(packagingOptions.value)) {
+        templateData[key] = template[key] || []
+      }
 
-    packagingStore.saveTemplate(selectedCategory.value, templateData)
-    await swal.success('模板已儲存！')
+      await packagingStore.saveTemplate(selectedCategory.value, templateData)
+      await swal.success('模板已儲存！')
+    } catch (error) {
+      console.error('儲存模板失敗', error)
+      await swal.error('儲存模板失敗，請稍後再試')
+    } finally {
+      loading.value = false
+    }
   }
 
   async function resetTemplate () {
@@ -146,13 +177,29 @@
 
     const result = await swal.confirm('確定要重置為預設值嗎？', '確認重置')
     if (result.isConfirmed) {
-      const defaults = packagingStore.getDefaultOptions(selectedCategory.value)
-      for (const key of Object.keys(packagingOptions)) {
-        template[key] = defaults[key] || []
+      loading.value = true
+      try {
+        // 刪除 Supabase 中的模板，使用預設值
+        const defaults = packagingStore.categoryDefaults[selectedCategory.value] || {}
+        for (const key of Object.keys(packagingOptions.value)) {
+          template[key] = defaults[key] || []
+        }
+        // 儲存為預設值
+        await packagingStore.saveTemplate(selectedCategory.value, defaults)
+        await swal.success('已重置為預設值！')
+      } catch (error) {
+        console.error('重置模板失敗', error)
+        await swal.error('重置模板失敗，請稍後再試')
+      } finally {
+        loading.value = false
       }
-      await swal.success('已重置為預設值！')
     }
   }
+
+  onMounted(async () => {
+    // 確保包裝選項已載入
+    await packagingStore.loadPackagingOptions()
+  })
 </script>
 
 <style scoped lang="scss">

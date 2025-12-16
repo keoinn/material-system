@@ -38,22 +38,10 @@ export default {
       throw new Error('Supabase 客戶端未初始化')
     }
 
-    // 先取得大類 ID
-    const { data: mainCategory } = await supabase
-      .from('product_categories')
-      .select('id')
-      .eq('code', mainCategoryCode)
-      .eq('level', 1)
-      .single()
-
-    if (!mainCategory) {
-      return []
-    }
-
     const { data, error } = await supabase
       .from('product_categories')
       .select('*')
-      .eq('parent_id', mainCategory.id)
+      .eq('main_category_code', mainCategoryCode)
       .eq('level', 2)
       .eq('is_active', true)
       .order('display_order', { ascending: true })

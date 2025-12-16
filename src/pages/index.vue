@@ -71,7 +71,8 @@
 </template>
 
 <script setup>
-  import { computed, onMounted, ref } from 'vue'
+  import { computed, onMounted, ref, watch } from 'vue'
+  import { useRoute } from 'vue-router'
   import ApplicationQuery from '@/components/ApplicationQuery.vue'
   import ExcelExport from '@/components/ExcelExport.vue'
   import MaterialApplicationForm from '@/components/MaterialApplicationForm.vue'
@@ -80,10 +81,18 @@
   import SystemSettings from '@/components/SystemSettings.vue'
   import { useApplicationsStore } from '@/stores/applications'
 
+  const route = useRoute()
   const tab = ref('apply')
   const applicationsStore = useApplicationsStore()
 
   const pendingCount = computed(() => applicationsStore.pendingCount)
+
+  // 監聽路由查詢參數，切換 tab
+  watch(() => route.query.tab, (newTab) => {
+    if (newTab && ['apply', 'packaging', 'review', 'export', 'query', 'settings'].includes(newTab)) {
+      tab.value = newTab
+    }
+  }, { immediate: true })
 
   // 快捷鍵支援
   onMounted(() => {

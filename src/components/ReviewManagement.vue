@@ -58,50 +58,164 @@
         </template>
       </v-data-table>
 
-      <!-- 詳情對話框 -->
-      <v-dialog v-model="detailDialog" max-width="800">
+      <!-- 申請詳情對話框 -->
+      <v-dialog
+        v-model="detailDialog"
+        max-width="900"
+        scrollable
+        persistent
+      >
         <v-card v-if="selectedApplication">
-          <v-card-title>
-            申請詳情
+          <v-card-title class="d-flex align-center bg-primary text-white">
+            <v-icon class="mr-2">mdi-file-document-outline</v-icon>
+            <span>申請詳情</span>
             <v-spacer />
-            <v-btn icon @click="detailDialog = false">
+            <v-btn
+              icon
+              variant="text"
+              @click="detailDialog = false"
+            >
               <v-icon>mdi-close</v-icon>
             </v-btn>
           </v-card-title>
 
-          <v-card-text>
-            <v-row>
-              <v-col cols="12" md="6">
-                <strong>申請單號：</strong>{{ selectedApplication.id }}
-              </v-col>
-              <v-col cols="12" md="6">
-                <strong>料號：</strong>{{ selectedApplication.itemCode }}
-              </v-col>
-              <v-col cols="12" md="6">
-                <strong>中文名稱：</strong>{{ selectedApplication.itemNameCN }}
-              </v-col>
-              <v-col cols="12" md="6">
-                <strong>英文名稱：</strong>{{ selectedApplication.itemNameEN }}
-              </v-col>
-              <v-col cols="12" md="6">
-                <strong>材質：</strong>{{ selectedApplication.material }}
-              </v-col>
-              <v-col cols="12" md="6">
-                <strong>表面處理：</strong>{{ selectedApplication.surfaceFinish || 'N/A' }}
-              </v-col>
-            </v-row>
+          <v-card-text class="pa-0">
+            <v-container>
+              <!-- 基本資訊區塊 -->
+              <v-card
+                class="mb-4"
+                variant="outlined"
+              >
+                <v-card-title class="text-subtitle-1 bg-grey-lighten-4">
+                  <v-icon class="mr-2">mdi-information</v-icon>
+                  基本資訊
+                </v-card-title>
+                <v-card-text>
+                  <v-row>
+                    <v-col cols="12" md="6">
+                      <div class="detail-item">
+                        <span class="detail-label">申請單號：</span>
+                        <span class="detail-value">{{ selectedApplication.id }}</span>
+                      </div>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                      <div class="detail-item">
+                        <span class="detail-label">料號：</span>
+                        <span class="detail-value font-weight-bold text-primary">
+                          {{ selectedApplication.itemCode }}
+                        </span>
+                      </div>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                      <div class="detail-item">
+                        <span class="detail-label">中文名稱：</span>
+                        <span class="detail-value">{{ selectedApplication.itemNameCN }}</span>
+                      </div>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                      <div class="detail-item">
+                        <span class="detail-label">英文名稱：</span>
+                        <span class="detail-value">{{ selectedApplication.itemNameEN }}</span>
+                      </div>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                      <div class="detail-item">
+                        <span class="detail-label">材質：</span>
+                        <span class="detail-value">{{ selectedApplication.material }}</span>
+                      </div>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                      <div class="detail-item">
+                        <span class="detail-label">表面處理：</span>
+                        <span class="detail-value">{{ selectedApplication.surfaceFinish || 'N/A' }}</span>
+                      </div>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                      <div class="detail-item">
+                        <span class="detail-label">申請人：</span>
+                        <span class="detail-value">{{ selectedApplication.applicant }}</span>
+                      </div>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                      <div class="detail-item">
+                        <span class="detail-label">申請日期：</span>
+                        <span class="detail-value">{{ formatDate(selectedApplication.submitDate) }}</span>
+                      </div>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                      <div class="detail-item">
+                        <span class="detail-label">狀態：</span>
+                        <v-chip
+                          :color="getStatusColor(selectedApplication.status)"
+                          size="small"
+                          variant="flat"
+                        >
+                          {{ getStatusText(selectedApplication.status) }}
+                        </v-chip>
+                      </div>
+                    </v-col>
+                  </v-row>
+                </v-card-text>
+              </v-card>
 
-            <v-divider class="my-4" />
-
-            <h3 class="mb-2">包裝說明</h3>
-            <div v-for="(section, key) in selectedApplication.packaging" :key="key">
-              <strong>{{ getPackagingSectionName(key) }}：</strong>
-              <span v-if="section.options?.length">
-                {{ section.options.join(', ') }}
-              </span>
-              <span v-if="section.description">{{ section.description }}</span>
-            </div>
+              <!-- 包裝說明區塊 -->
+              <v-card variant="outlined">
+                <v-card-title class="text-subtitle-1 bg-grey-lighten-4">
+                  <v-icon class="mr-2">mdi-package-variant</v-icon>
+                  包裝說明
+                </v-card-title>
+                <v-card-text>
+                  <div
+                    v-for="(section, key) in selectedApplication.packaging"
+                    :key="key"
+                    class="packaging-section"
+                  >
+                    <div class="packaging-section-title">
+                      {{ getPackagingSectionName(key) }}
+                    </div>
+                    <div class="packaging-section-content">
+                      <div v-if="section.options?.length" class="mb-2">
+                        <span class="text-grey-darken-1">選項：</span>
+                        <v-chip
+                          v-for="(option, index) in section.options"
+                          :key="index"
+                          class="ma-1"
+                          color="primary"
+                          size="small"
+                          variant="outlined"
+                        >
+                          {{ option }}
+                        </v-chip>
+                      </div>
+                      <div v-if="section.description">
+                        <span class="text-grey-darken-1">說明：</span>
+                        <span>{{ section.description }}</span>
+                      </div>
+                      <div
+                        v-if="!section.options?.length && !section.description"
+                        class="text-grey"
+                      >
+                        無資料
+                      </div>
+                    </div>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </v-container>
           </v-card-text>
+
+          <v-divider />
+
+          <v-card-actions class="pa-4">
+            <v-spacer />
+            <v-btn
+              color="primary"
+              variant="flat"
+              @click="detailDialog = false"
+            >
+              關閉
+            </v-btn>
+          </v-card-actions>
         </v-card>
       </v-dialog>
 
@@ -231,4 +345,48 @@
 
 <style scoped lang="scss">
 @import '@/styles/material-system.scss';
+
+.detail-item {
+  padding: 8px 0;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.6);
+  margin-right: 8px;
+  min-width: 100px;
+}
+
+.detail-value {
+  color: rgba(0, 0, 0, 0.87);
+  flex: 1;
+}
+
+.packaging-section {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+
+  &:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+}
+
+.packaging-section-title {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.87);
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+
+.packaging-section-content {
+  padding-left: 16px;
+  color: rgba(0, 0, 0, 0.7);
+}
 </style>

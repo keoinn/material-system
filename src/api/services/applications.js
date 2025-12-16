@@ -4,8 +4,8 @@
  * 根據環境變數自動選擇使用 Supabase 或 Axios 實作
  */
 import { getBackendType } from '../client.js'
-import * as axiosImpl from './axios/applications.js'
-import * as supabaseImpl from './supabase/applications.js'
+import axiosImpl from './axios/applications.js'
+import supabaseImpl from './supabase/applications.js'
 
 /**
  * 取得當前使用的後端實作

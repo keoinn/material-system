@@ -4,8 +4,8 @@
  * 根據環境變數自動選擇使用 Supabase 或 Axios 實作
  */
 import { getBackendType } from '../client.js'
-import * as axiosImpl from './axios/packaging.js'
-import * as supabaseImpl from './supabase/packaging.js'
+import axiosImpl from './axios/packaging.js'
+import supabaseImpl from './supabase/packaging.js'
 
 /**
  * 取得當前使用的後端實作
@@ -69,5 +69,24 @@ export const packagingService = {
    */
   async saveApplicationPackaging (applicationId, packagingData) {
     return getImplementation().saveApplicationPackaging(applicationId, packagingData)
+  },
+
+  /**
+   * 儲存類別預設包裝模板
+   * @param {string} mainCategoryCode - 產品大類代碼
+   * @param {Object} templateData - 模板資料 { categoryCode: [optionCode, ...] }
+   * @returns {Promise<Array>}
+   */
+  async saveCategoryDefaults (mainCategoryCode, templateData) {
+    return getImplementation().saveCategoryDefaults(mainCategoryCode, templateData)
+  },
+
+  /**
+   * 刪除類別預設包裝模板
+   * @param {string} mainCategoryCode - 產品大類代碼
+   * @returns {Promise<void>}
+   */
+  async deleteCategoryDefaults (mainCategoryCode) {
+    return getImplementation().deleteCategoryDefaults(mainCategoryCode)
   },
 }

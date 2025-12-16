@@ -20,7 +20,7 @@ $$ LANGUAGE plpgsql;
 -- 三層階層結構：大類 → 中類 → 小類
 CREATE TABLE IF NOT EXISTS product_categories (
   id BIGSERIAL PRIMARY KEY,
-  code VARCHAR(10) NOT NULL UNIQUE,        -- 分類代碼 (H, S, M, 01, 02, A, B, C)
+  code VARCHAR(10) NOT NULL,        -- 分類代碼 (H, S, M, 01, 02, A, B, C)
   name VARCHAR(255) NOT NULL,               -- 分類名稱（英文）
   name_cn VARCHAR(255),                     -- 中文名稱
   level INTEGER NOT NULL,                   -- 層級 (1=大類, 2=中類, 3=小類)
@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS product_categories (
   is_active BOOLEAN DEFAULT TRUE,          -- 是否啟用
   description TEXT,                        -- 說明
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(level, code, main_category_code) -- 複合唯一約束：同一層級、同一大類下 code 必須唯一
 );
 
 COMMENT ON TABLE product_categories IS '產品分類系統：三層階層結構（大類、中類、小類）';
@@ -197,106 +198,106 @@ INSERT INTO product_categories (code, name, name_cn, level, parent_id, main_cate
 ('B', 'Builders Hardware', 'B - Builders Hardware (建築五金)', 1, NULL, 'B', 6, '建築用五金'),
 ('I', 'Industrial Parts Solution', 'I - Industrial Parts Solution (工業零件)', 1, NULL, 'I', 7, '工業解決方案'),
 ('O', 'Others', 'O - Others (其他)', 1, NULL, 'O', 8, '未分類項目')
-ON CONFLICT (code) DO NOTHING;
+ON CONFLICT (level, code, main_category_code) DO NOTHING;
 
 -- 1.2 中類 (Level 2) - H 類別
 INSERT INTO product_categories (code, name, name_cn, level, parent_id, main_category_code, display_order, description) VALUES
-('H00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'H'), 'H', 0, NULL),
-('H01', 'Knob', 'Knob', 2, (SELECT id FROM product_categories WHERE code = 'H'), 'H', 1, '旋鈕'),
-('H02', 'Pull', 'Pull', 2, (SELECT id FROM product_categories WHERE code = 'H'), 'H', 2, '拉手'),
-('H03', 'Handle', 'Handle', 2, (SELECT id FROM product_categories WHERE code = 'H'), 'H', 3, '把手'),
-('H04', 'Bar Handle', 'Bar Handle', 2, (SELECT id FROM product_categories WHERE code = 'H'), 'H', 4, '橫桿把手'),
-('H05', 'Cup Pull', 'Cup Pull', 2, (SELECT id FROM product_categories WHERE code = 'H'), 'H', 5, '杯型拉手'),
-('H06', 'Ring Pull', 'Ring Pull', 2, (SELECT id FROM product_categories WHERE code = 'H'), 'H', 6, '環型拉手')
-ON CONFLICT (code) DO NOTHING;
+('00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'H' AND level = 1), 'H', 0, NULL),
+('01', 'Knob', 'Knob', 2, (SELECT id FROM product_categories WHERE code = 'H' AND level = 1), 'H', 1, '旋鈕'),
+('02', 'Pull', 'Pull', 2, (SELECT id FROM product_categories WHERE code = 'H' AND level = 1), 'H', 2, '拉手'),
+('03', 'Handle', 'Handle', 2, (SELECT id FROM product_categories WHERE code = 'H' AND level = 1), 'H', 3, '把手'),
+('04', 'Bar Handle', 'Bar Handle', 2, (SELECT id FROM product_categories WHERE code = 'H' AND level = 1), 'H', 4, '橫桿把手'),
+('05', 'Cup Pull', 'Cup Pull', 2, (SELECT id FROM product_categories WHERE code = 'H' AND level = 1), 'H', 5, '杯型拉手'),
+('06', 'Ring Pull', 'Ring Pull', 2, (SELECT id FROM product_categories WHERE code = 'H' AND level = 1), 'H', 6, '環型拉手')
+ON CONFLICT (level, code, main_category_code) DO NOTHING;
 
 -- 1.3 中類 (Level 2) - S 類別
 INSERT INTO product_categories (code, name, name_cn, level, parent_id, main_category_code, display_order, description) VALUES
-('S00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'S'), 'S', 0, NULL),
-('S01', 'Ball Bearing Slide', 'Ball Bearing Slide', 2, (SELECT id FROM product_categories WHERE code = 'S'), 'S', 1, '滾珠滑軌'),
-('S02', 'Undermount Slide', 'Undermount Slide', 2, (SELECT id FROM product_categories WHERE code = 'S'), 'S', 2, '底裝滑軌'),
-('S03', 'Soft Close Slide', 'Soft Close Slide', 2, (SELECT id FROM product_categories WHERE code = 'S'), 'S', 3, '緩衝滑軌'),
-('S04', 'Heavy Duty Slide', 'Heavy Duty Slide', 2, (SELECT id FROM product_categories WHERE code = 'S'), 'S', 4, '重載滑軌')
-ON CONFLICT (code) DO NOTHING;
+('00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'S' AND level = 1), 'S', 0, NULL),
+('01', 'Ball Bearing Slide', 'Ball Bearing Slide', 2, (SELECT id FROM product_categories WHERE code = 'S' AND level = 1), 'S', 1, '滾珠滑軌'),
+('02', 'Undermount Slide', 'Undermount Slide', 2, (SELECT id FROM product_categories WHERE code = 'S' AND level = 1), 'S', 2, '底裝滑軌'),
+('03', 'Soft Close Slide', 'Soft Close Slide', 2, (SELECT id FROM product_categories WHERE code = 'S' AND level = 1), 'S', 3, '緩衝滑軌'),
+('04', 'Heavy Duty Slide', 'Heavy Duty Slide', 2, (SELECT id FROM product_categories WHERE code = 'S' AND level = 1), 'S', 4, '重載滑軌')
+ON CONFLICT (level, code, main_category_code) DO NOTHING;
 
 -- 1.4 中類 (Level 2) - M 類別
 INSERT INTO product_categories (code, name, name_cn, level, parent_id, main_category_code, display_order, description) VALUES
-('M00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'M'), 'M', 0, NULL),
-('M01', 'Drawer System', 'Drawer System', 2, (SELECT id FROM product_categories WHERE code = 'M'), 'M', 1, '抽屜系統'),
-('M02', 'Pull-Out System', 'Pull-Out System', 2, (SELECT id FROM product_categories WHERE code = 'M'), 'M', 2, '拉出系統'),
-('M03', 'Organizer', 'Organizer', 2, (SELECT id FROM product_categories WHERE code = 'M'), 'M', 3, '收納系統'),
-('M04', 'Basket System', 'Basket System', 2, (SELECT id FROM product_categories WHERE code = 'M'), 'M', 4, '籃架系統')
-ON CONFLICT (code) DO NOTHING;
+('00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'M' AND level = 1), 'M', 0, NULL),
+('01', 'Drawer System', 'Drawer System', 2, (SELECT id FROM product_categories WHERE code = 'M' AND level = 1), 'M', 1, '抽屜系統'),
+('02', 'Pull-Out System', 'Pull-Out System', 2, (SELECT id FROM product_categories WHERE code = 'M' AND level = 1), 'M', 2, '拉出系統'),
+('03', 'Organizer', 'Organizer', 2, (SELECT id FROM product_categories WHERE code = 'M' AND level = 1), 'M', 3, '收納系統'),
+('04', 'Basket System', 'Basket System', 2, (SELECT id FROM product_categories WHERE code = 'M' AND level = 1), 'M', 4, '籃架系統')
+ON CONFLICT (level, code, main_category_code) DO NOTHING;
 
 -- 1.5 中類 (Level 2) - D, F, B, I, O 類別
 INSERT INTO product_categories (code, name, name_cn, level, parent_id, main_category_code, display_order, description) VALUES
 -- D 類別
-('D00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'D'), 'D', 0, NULL),
-('D01', 'Furniture Leg', 'Furniture Leg', 2, (SELECT id FROM product_categories WHERE code = 'D'), 'D', 1, '家具腳'),
-('D02', 'Decorative Handle', 'Decorative Handle', 2, (SELECT id FROM product_categories WHERE code = 'D'), 'D', 2, '裝飾把手'),
-('D03', 'Ornament', 'Ornament', 2, (SELECT id FROM product_categories WHERE code = 'D'), 'D', 3, '裝飾品'),
+('00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'D' AND level = 1), 'D', 0, NULL),
+('01', 'Furniture Leg', 'Furniture Leg', 2, (SELECT id FROM product_categories WHERE code = 'D' AND level = 1), 'D', 1, '家具腳'),
+('02', 'Decorative Handle', 'Decorative Handle', 2, (SELECT id FROM product_categories WHERE code = 'D' AND level = 1), 'D', 2, '裝飾把手'),
+('03', 'Ornament', 'Ornament', 2, (SELECT id FROM product_categories WHERE code = 'D' AND level = 1), 'D', 3, '裝飾品'),
 -- F 類別
-('F00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'F'), 'F', 0, NULL),
-('F01', 'Hinge', 'Hinge', 2, (SELECT id FROM product_categories WHERE code = 'F'), 'F', 1, '鉸鏈'),
-('F02', 'Caster', 'Caster', 2, (SELECT id FROM product_categories WHERE code = 'F'), 'F', 2, '腳輪'),
-('F03', 'Lock', 'Lock', 2, (SELECT id FROM product_categories WHERE code = 'F'), 'F', 3, '鎖具'),
-('F04', 'Catch', 'Catch', 2, (SELECT id FROM product_categories WHERE code = 'F'), 'F', 4, '扣件'),
+('00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'F' AND level = 1), 'F', 0, NULL),
+('01', 'Hinge', 'Hinge', 2, (SELECT id FROM product_categories WHERE code = 'F' AND level = 1), 'F', 1, '鉸鏈'),
+('02', 'Caster', 'Caster', 2, (SELECT id FROM product_categories WHERE code = 'F' AND level = 1), 'F', 2, '腳輪'),
+('03', 'Lock', 'Lock', 2, (SELECT id FROM product_categories WHERE code = 'F' AND level = 1), 'F', 3, '鎖具'),
+('04', 'Catch', 'Catch', 2, (SELECT id FROM product_categories WHERE code = 'F' AND level = 1), 'F', 4, '扣件'),
 -- B 類別
-('B00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'B'), 'B', 0, NULL),
-('B01', 'Door Hardware', 'Door Hardware', 2, (SELECT id FROM product_categories WHERE code = 'B'), 'B', 1, '門用五金'),
-('B02', 'Window Hardware', 'Window Hardware', 2, (SELECT id FROM product_categories WHERE code = 'B'), 'B', 2, '窗用五金'),
-('B03', 'Gate Hardware', 'Gate Hardware', 2, (SELECT id FROM product_categories WHERE code = 'B'), 'B', 3, '門閘五金'),
+('00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'B' AND level = 1), 'B', 0, NULL),
+('01', 'Door Hardware', 'Door Hardware', 2, (SELECT id FROM product_categories WHERE code = 'B' AND level = 1), 'B', 1, '門用五金'),
+('02', 'Window Hardware', 'Window Hardware', 2, (SELECT id FROM product_categories WHERE code = 'B' AND level = 1), 'B', 2, '窗用五金'),
+('03', 'Gate Hardware', 'Gate Hardware', 2, (SELECT id FROM product_categories WHERE code = 'B' AND level = 1), 'B', 3, '門閘五金'),
 -- I 類別
-('I00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'I'), 'I', 0, NULL),
-('I01', 'Industrial Slide', 'Industrial Slide', 2, (SELECT id FROM product_categories WHERE code = 'I'), 'I', 1, '工業滑軌'),
-('I02', 'Heavy Duty Component', 'Heavy Duty Component', 2, (SELECT id FROM product_categories WHERE code = 'I'), 'I', 2, '重載組件'),
-('I03', 'Custom Solution', 'Custom Solution', 2, (SELECT id FROM product_categories WHERE code = 'I'), 'I', 3, '客製化解決方案'),
+('00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'I' AND level = 1), 'I', 0, NULL),
+('01', 'Industrial Slide', 'Industrial Slide', 2, (SELECT id FROM product_categories WHERE code = 'I' AND level = 1), 'I', 1, '工業滑軌'),
+('02', 'Heavy Duty Component', 'Heavy Duty Component', 2, (SELECT id FROM product_categories WHERE code = 'I' AND level = 1), 'I', 2, '重載組件'),
+('03', 'Custom Solution', 'Custom Solution', 2, (SELECT id FROM product_categories WHERE code = 'I' AND level = 1), 'I', 3, '客製化解決方案'),
 -- O 類別
-('O00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'O'), 'O', 0, NULL),
-('O99', '其他', '其他', 2, (SELECT id FROM product_categories WHERE code = 'O'), 'O', 99, NULL)
-ON CONFLICT (code) DO NOTHING;
+('00', '未分類', '未分類', 2, (SELECT id FROM product_categories WHERE code = 'O' AND level = 1), 'O', 0, NULL),
+('99', '其他', '其他', 2, (SELECT id FROM product_categories WHERE code = 'O' AND level = 1), 'O', 99, NULL)
+ON CONFLICT (level, code, main_category_code) DO NOTHING;
 
 -- 1.6 小類 (Level 3) - H 類別
 INSERT INTO product_categories (code, name, name_cn, level, parent_id, main_category_code, display_order, description) VALUES
-('HA', 'Aluminum', 'Aluminum', 3, (SELECT id FROM product_categories WHERE code = 'H'), 'H', 1, '鋁'),
-('HB', 'Brass', 'Brass', 3, (SELECT id FROM product_categories WHERE code = 'H'), 'H', 2, '黃銅'),
-('HC', 'Chrome', 'Chrome', 3, (SELECT id FROM product_categories WHERE code = 'H'), 'H', 3, '鍍鉻'),
-('HS', 'Stainless Steel', 'Stainless Steel', 3, (SELECT id FROM product_categories WHERE code = 'H'), 'H', 4, '不鏽鋼'),
-('HZ', 'Zinc Alloy', 'Zinc Alloy', 3, (SELECT id FROM product_categories WHERE code = 'H'), 'H', 5, '鋅合金')
-ON CONFLICT (code) DO NOTHING;
+('A', 'Aluminum', 'Aluminum', 3, (SELECT id FROM product_categories WHERE code = 'H' AND level = 1), 'H', 1, '鋁'),
+('B', 'Brass', 'Brass', 3, (SELECT id FROM product_categories WHERE code = 'H' AND level = 1), 'H', 2, '黃銅'),
+('C', 'Chrome', 'Chrome', 3, (SELECT id FROM product_categories WHERE code = 'H' AND level = 1), 'H', 3, '鍍鉻'),
+('S', 'Stainless Steel', 'Stainless Steel', 3, (SELECT id FROM product_categories WHERE code = 'H' AND level = 1), 'H', 4, '不鏽鋼'),
+('Z', 'Zinc Alloy', 'Zinc Alloy', 3, (SELECT id FROM product_categories WHERE code = 'H' AND level = 1), 'H', 5, '鋅合金')
+ON CONFLICT (level, code, main_category_code) DO NOTHING;
 
 -- 1.7 小類 (Level 3) - S, M, D, F, B, I, O 類別
 INSERT INTO product_categories (code, name, name_cn, level, parent_id, main_category_code, display_order, description) VALUES
 -- S 類別
-('SB', 'Ball Bearing', 'Ball Bearing', 3, (SELECT id FROM product_categories WHERE code = 'S'), 'S', 1, '滾珠軸承'),
-('SS', 'Soft Close', 'Soft Close', 3, (SELECT id FROM product_categories WHERE code = 'S'), 'S', 2, '緩衝關閉'),
-('SF', 'Full Extension', 'Full Extension', 3, (SELECT id FROM product_categories WHERE code = 'S'), 'S', 3, '全開式'),
-('SP', 'Partial Extension', 'Partial Extension', 3, (SELECT id FROM product_categories WHERE code = 'S'), 'S', 4, '部分開啟'),
+('B', 'Ball Bearing', 'Ball Bearing', 3, (SELECT id FROM product_categories WHERE code = 'S' AND level = 1), 'S', 1, '滾珠軸承'),
+('S', 'Soft Close', 'Soft Close', 3, (SELECT id FROM product_categories WHERE code = 'S' AND level = 1), 'S', 2, '緩衝關閉'),
+('F', 'Full Extension', 'Full Extension', 3, (SELECT id FROM product_categories WHERE code = 'S' AND level = 1), 'S', 3, '全開式'),
+('P', 'Partial Extension', 'Partial Extension', 3, (SELECT id FROM product_categories WHERE code = 'S' AND level = 1), 'S', 4, '部分開啟'),
 -- M 類別
-('MD', 'Drawer', 'Drawer', 3, (SELECT id FROM product_categories WHERE code = 'M'), 'M', 1, '抽屜'),
-('MP', 'Pull-Out', 'Pull-Out', 3, (SELECT id FROM product_categories WHERE code = 'M'), 'M', 2, '拉出'),
-('MO', 'Organizer', 'Organizer', 3, (SELECT id FROM product_categories WHERE code = 'M'), 'M', 3, '收納'),
-('MB', 'Basket', 'Basket', 3, (SELECT id FROM product_categories WHERE code = 'M'), 'M', 4, '籃架'),
+('D', 'Drawer', 'Drawer', 3, (SELECT id FROM product_categories WHERE code = 'M' AND level = 1), 'M', 1, '抽屜'),
+('P', 'Pull-Out', 'Pull-Out', 3, (SELECT id FROM product_categories WHERE code = 'M' AND level = 1), 'M', 2, '拉出'),
+('O', 'Organizer', 'Organizer', 3, (SELECT id FROM product_categories WHERE code = 'M' AND level = 1), 'M', 3, '收納'),
+('B', 'Basket', 'Basket', 3, (SELECT id FROM product_categories WHERE code = 'M' AND level = 1), 'M', 4, '籃架'),
 -- D 類別
-('DL', 'Leg', 'Leg', 3, (SELECT id FROM product_categories WHERE code = 'D'), 'D', 1, '腳'),
-('DH', 'Handle', 'Handle', 3, (SELECT id FROM product_categories WHERE code = 'D'), 'D', 2, '把手'),
-('DO', 'Ornament', 'Ornament', 3, (SELECT id FROM product_categories WHERE code = 'D'), 'D', 3, '裝飾'),
+('L', 'Leg', 'Leg', 3, (SELECT id FROM product_categories WHERE code = 'D' AND level = 1), 'D', 1, '腳'),
+('H', 'Handle', 'Handle', 3, (SELECT id FROM product_categories WHERE code = 'D' AND level = 1), 'D', 2, '把手'),
+('O', 'Ornament', 'Ornament', 3, (SELECT id FROM product_categories WHERE code = 'D' AND level = 1), 'D', 3, '裝飾'),
 -- F 類別
-('FH', 'Hinge', 'Hinge', 3, (SELECT id FROM product_categories WHERE code = 'F'), 'F', 1, '鉸鏈'),
-('FC', 'Caster', 'Caster', 3, (SELECT id FROM product_categories WHERE code = 'F'), 'F', 2, '腳輪'),
-('FL', 'Lock', 'Lock', 3, (SELECT id FROM product_categories WHERE code = 'F'), 'F', 3, '鎖具'),
-('FT', 'Catch', 'Catch', 3, (SELECT id FROM product_categories WHERE code = 'F'), 'F', 4, '扣件'),
+('H', 'Hinge', 'Hinge', 3, (SELECT id FROM product_categories WHERE code = 'F' AND level = 1), 'F', 1, '鉸鏈'),
+('C', 'Caster', 'Caster', 3, (SELECT id FROM product_categories WHERE code = 'F' AND level = 1), 'F', 2, '腳輪'),
+('L', 'Lock', 'Lock', 3, (SELECT id FROM product_categories WHERE code = 'F' AND level = 1), 'F', 3, '鎖具'),
+('T', 'Catch', 'Catch', 3, (SELECT id FROM product_categories WHERE code = 'F' AND level = 1), 'F', 4, '扣件'),
 -- B 類別
-('BD', 'Door', 'Door', 3, (SELECT id FROM product_categories WHERE code = 'B'), 'B', 1, '門'),
-('BW', 'Window', 'Window', 3, (SELECT id FROM product_categories WHERE code = 'B'), 'B', 2, '窗'),
-('BG', 'Gate', 'Gate', 3, (SELECT id FROM product_categories WHERE code = 'B'), 'B', 3, '門閘'),
+('D', 'Door', 'Door', 3, (SELECT id FROM product_categories WHERE code = 'B' AND level = 1), 'B', 1, '門'),
+('W', 'Window', 'Window', 3, (SELECT id FROM product_categories WHERE code = 'B' AND level = 1), 'B', 2, '窗'),
+('G', 'Gate', 'Gate', 3, (SELECT id FROM product_categories WHERE code = 'B' AND level = 1), 'B', 3, '門閘'),
 -- I 類別
-('IS', 'Slide', 'Slide', 3, (SELECT id FROM product_categories WHERE code = 'I'), 'I', 1, '滑軌'),
-('IH', 'Heavy Duty', 'Heavy Duty', 3, (SELECT id FROM product_categories WHERE code = 'I'), 'I', 2, '重載'),
-('IC', 'Custom', 'Custom', 3, (SELECT id FROM product_categories WHERE code = 'I'), 'I', 3, '客製化'),
+('S', 'Slide', 'Slide', 3, (SELECT id FROM product_categories WHERE code = 'I' AND level = 1), 'I', 1, '滑軌'),
+('H', 'Heavy Duty', 'Heavy Duty', 3, (SELECT id FROM product_categories WHERE code = 'I' AND level = 1), 'I', 2, '重載'),
+('C', 'Custom', 'Custom', 3, (SELECT id FROM product_categories WHERE code = 'I' AND level = 1), 'I', 3, '客製化'),
 -- O 類別
-('OX', '其他', '其他', 3, (SELECT id FROM product_categories WHERE code = 'O'), 'O', 1, NULL)
-ON CONFLICT (code) DO NOTHING;
+('X', '其他', '其他', 3, (SELECT id FROM product_categories WHERE code = 'O' AND level = 1), 'O', 1, NULL)
+ON CONFLICT (level, code, main_category_code) DO NOTHING;
 
 -- 2. 供應商資料
 INSERT INTO suppliers (code, name, contact_person, email, phone, address, country, is_active) VALUES
@@ -635,6 +636,9 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 建立觸發器：當 auth.users 有新使用者時自動建立 profile
+-- 先刪除已存在的觸發器（如果有的話）
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW

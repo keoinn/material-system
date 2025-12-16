@@ -57,5 +57,23 @@ export default {
     })
     return response.data || response
   },
+
+  /**
+   * 儲存類別預設包裝模板
+   */
+  async saveCategoryDefaults (mainCategoryCode, templateData) {
+    const response = await apiClient.post(`/packaging/defaults/${mainCategoryCode}`, {
+      template: templateData,
+    })
+    return response.data || response
+  },
+
+  /**
+   * 刪除類別預設包裝模板
+   */
+  async deleteCategoryDefaults (mainCategoryCode) {
+    const response = await apiClient.delete(`/packaging/defaults/${mainCategoryCode}`)
+    return response.data || response
+  },
 }
 

@@ -5,6 +5,13 @@
     </v-card-title>
 
     <v-card-text class="pt-6">
+      <v-progress-linear
+        v-if="loading"
+        class="mb-4"
+        color="primary"
+        indeterminate
+      />
+
       <v-form ref="formRef" v-model="valid">
         <!-- 基本資料 -->
         <div class="form-section">
@@ -15,6 +22,7 @@
                 v-model="form.mainCategory"
                 :items="mainCategories"
                 label="產品大類 *"
+                required
                 :rules="[rules.required]"
                 variant="outlined"
                 @update:model-value="handleMainCategoryChange"
@@ -26,6 +34,7 @@
                 :disabled="!form.mainCategory"
                 :items="subCategories"
                 label="產品中類 *"
+                required
                 :rules="[rules.required]"
                 variant="outlined"
                 @update:model-value="handleSubCategoryChange"
@@ -37,6 +46,7 @@
                 :disabled="!form.subCategory"
                 :items="specCategories"
                 label="產品小類 *"
+                required
                 :rules="[rules.required]"
                 variant="outlined"
                 @update:model-value="handleSpecCategoryChange"
@@ -62,6 +72,7 @@
               <v-text-field
                 v-model="form.itemNameCN"
                 label="料件說明 (中文) *"
+                required
                 :rules="[rules.required]"
                 variant="outlined"
               />
@@ -70,6 +81,7 @@
               <v-text-field
                 v-model="form.itemNameEN"
                 label="料件說明 (英文) *"
+                required
                 :rules="[rules.required]"
                 variant="outlined"
               />
@@ -94,6 +106,7 @@
                 v-model="form.material"
                 :items="materials"
                 label="基本材質 *"
+                required
                 :rules="[rules.required]"
                 variant="outlined"
               />
@@ -182,204 +195,208 @@
 </template>
 
 <script setup>
-  import { computed, reactive, ref, watch } from 'vue'
+  import { onMounted, reactive, ref } from 'vue'
+  import { useRouter } from 'vue-router'
+  import { applicationsService } from '@/api/services/applications'
+  import { categoriesService } from '@/api/services/categories'
+  import { packagingService } from '@/api/services/packaging'
+  import { suppliersService } from '@/api/services/suppliers'
+  import { systemOptionsService } from '@/api/services/systemOptions'
   import { useSwal } from '@/composables/useSwal'
   import { useApplicationsStore } from '@/stores/applications'
-  import { useAuthStore } from '@/stores/auth'
   import { usePackagingStore } from '@/stores/packaging'
   import PackagingFormSection from './PackagingFormSection.vue'
 
   const swal = useSwal()
+  const router = useRouter()
 
   const applicationsStore = useApplicationsStore()
-  const authStore = useAuthStore()
   const packagingStore = usePackagingStore()
 
   const formRef = ref(null)
   const valid = ref(false)
   const submitting = ref(false)
+  const loading = ref(false)
 
-  // 分類資料
-  const categories = {
-    H: {
-      name: 'Handle',
-      subCategories: {
-        '00': '未分類',
-        '01': 'Knob',
-        '02': 'Pull',
-        '03': 'Handle',
-        '04': 'Bar Handle',
-        '05': 'Cup Pull',
-        '06': 'Ring Pull',
-      },
-      specs: {
-        A: 'Aluminum',
-        B: 'Brass',
-        C: 'Chrome',
-        S: 'Stainless Steel',
-        Z: 'Zinc Alloy',
-      },
-    },
-    S: {
-      name: 'Slide',
-      subCategories: {
-        '00': '未分類',
-        '01': 'Ball Bearing Slide',
-        '02': 'Undermount Slide',
-        '03': 'Soft Close Slide',
-        '04': 'Heavy Duty Slide',
-      },
-      specs: {
-        B: 'Ball Bearing',
-        S: 'Soft Close',
-        F: 'Full Extension',
-        P: 'Partial Extension',
-      },
-    },
-    M: {
-      name: 'Module/Assy',
-      subCategories: {
-        '00': '未分類',
-        '01': 'Drawer System',
-        '02': 'Pull-Out System',
-        '03': 'Organizer',
-        '04': 'Basket System',
-      },
-      specs: {
-        D: 'Drawer',
-        P: 'Pull-Out',
-        O: 'Organizer',
-        B: 'Basket',
-      },
-    },
-    D: {
-      name: 'Decorative Hardware',
-      subCategories: {
-        '00': '未分類',
-        '01': 'Furniture Leg',
-        '02': 'Decorative Handle',
-        '03': 'Ornament',
-      },
-      specs: {
-        L: 'Leg',
-        H: 'Handle',
-        O: 'Ornament',
-      },
-    },
-    F: {
-      name: 'Functional Hardware',
-      subCategories: {
-        '00': '未分類',
-        '01': 'Hinge',
-        '02': 'Caster',
-        '03': 'Lock',
-        '04': 'Catch',
-      },
-      specs: {
-        H: 'Hinge',
-        C: 'Caster',
-        L: 'Lock',
-        T: 'Catch',
-      },
-    },
-    B: {
-      name: 'Builders Hardware',
-      subCategories: {
-        '00': '未分類',
-        '01': 'Door Hardware',
-        '02': 'Window Hardware',
-        '03': 'Gate Hardware',
-      },
-      specs: {
-        D: 'Door',
-        W: 'Window',
-        G: 'Gate',
-      },
-    },
-    I: {
-      name: 'Industrial Parts Solution',
-      subCategories: {
-        '00': '未分類',
-        '01': 'Industrial Slide',
-        '02': 'Heavy Duty Component',
-        '03': 'Custom Solution',
-      },
-      specs: {
-        S: 'Slide',
-        H: 'Heavy Duty',
-        C: 'Custom',
-      },
-    },
-    O: {
-      name: 'Others',
-      subCategories: {
-        '00': '未分類',
-        '99': '其他',
-      },
-      specs: {
-        X: '其他',
-      },
-    },
+  // 資料載入狀態
+  const mainCategories = ref([])
+  const subCategories = ref([])
+  const specCategories = ref([])
+  const suppliers = ref([])
+  const materials = ref([])
+  const surfaceFinishes = ref([])
+
+  // 載入分類資料
+  async function loadMainCategories () {
+    try {
+      const data = await categoriesService.getMainCategories()
+      mainCategories.value = (data || []).map(cat => ({
+        title: `${cat.name_cn || cat.name}`,
+        value: cat.code,
+      }))
+    } catch (error) {
+      console.error('載入產品大類失敗', error)
+      await swal.error('載入產品大類失敗，請重新整理頁面')
+    }
   }
 
-  const mainCategories = [
-    { title: 'H - Handle (把手)', value: 'H' },
-    { title: 'S - Slide (滑軌)', value: 'S' },
-    { title: 'M - Module/Assy (模組)', value: 'M' },
-    { title: 'D - Decorative Hardware (裝飾五金)', value: 'D' },
-    { title: 'F - Functional Hardware (功能五金)', value: 'F' },
-    { title: 'B - Builders Hardware (建築五金)', value: 'B' },
-    { title: 'I - Industrial Parts Solution (工業零件)', value: 'I' },
-    { title: 'O - Others (其他)', value: 'O' },
-  ]
-
-  const subCategories = computed(() => {
-    if (!form.mainCategory || !categories[form.mainCategory]) {
-      return []
+  // 載入中類資料
+  async function loadSubCategories () {
+    if (!form.mainCategory) {
+      subCategories.value = []
+      return
     }
-    const subCats = categories[form.mainCategory].subCategories
-    return Object.entries(subCats).map(([code, name]) => ({
-      title: `${code} - ${name}`,
-      value: code,
-    }))
+
+    try {
+      const data = await categoriesService.getSubCategories(form.mainCategory)
+      subCategories.value = (data || []).map(cat => ({
+        title: `${cat.code} - ${cat.name_cn || cat.name}`,
+        value: cat.code,
+      }))
+    } catch (error) {
+      console.error('載入產品中類失敗', error)
+      subCategories.value = []
+    }
+  }
+
+  // 載入小類資料
+  async function loadSpecCategories () {
+    if (!form.mainCategory) {
+      specCategories.value = []
+      return
+    }
+
+    try {
+      const data = await categoriesService.getSpecCategories(form.mainCategory)
+      specCategories.value = (data || []).map(cat => ({
+        title: `${cat.code} - ${cat.name_cn || cat.name}`,
+        value: cat.code,
+      }))
+    } catch (error) {
+      console.error('載入產品小類失敗', error)
+      specCategories.value = []
+    }
+  }
+
+  // 載入供應商資料
+  async function loadSuppliers () {
+    try {
+      const data = await suppliersService.getSuppliers({ isActive: true })
+      suppliers.value = (data || []).map(sup => ({
+        title: sup.name,
+        value: sup.code || sup.id.toString(),
+      }))
+    } catch (error) {
+      console.error('載入供應商失敗', error)
+      await swal.warning('載入供應商失敗，將使用預設值')
+    }
+  }
+
+  // 載入材質選項
+  async function loadMaterials () {
+    try {
+      const data = await systemOptionsService.getOptions('material_application', 'material')
+      materials.value = (data || []).map(item => ({
+        title: item.label || item.value,
+        value: item.value,
+      }))
+    } catch (error) {
+      console.error('載入材質選項失敗', error)
+      // 使用預設值
+      materials.value = [
+        'Steel',
+        'Stainless Steel',
+        'Brass',
+        'Zinc Alloy (Zamak)',
+        'Aluminum',
+        'Plastic',
+        'Wood',
+        'Others',
+      ].map(item => ({
+        title: item,
+        value: item,
+      }))
+    }
+  }
+
+  // 載入表面處理選項
+  async function loadSurfaceFinishes () {
+    try {
+      const data = await systemOptionsService.getOptions('material_application', 'surfaceFinish')
+      surfaceFinishes.value = (data || []).map(item => ({
+        title: item.label || item.value,
+        value: item.value,
+      }))
+    } catch (error) {
+      console.error('載入表面處理選項失敗', error)
+      // 使用預設值
+      surfaceFinishes.value = [
+        'Chrome Plated',
+        'Nickel Plated',
+        'Zinc Plated',
+        'Powder Coating',
+        'Anodized',
+        'Natural',
+      ].map(item => ({
+        title: item,
+        value: item,
+      }))
+    }
+  }
+
+  // 初始化載入所有資料
+  async function loadAllData () {
+    loading.value = true
+    try {
+      await Promise.all([
+        loadMainCategories(),
+        loadSuppliers(),
+        loadMaterials(),
+        loadSurfaceFinishes(),
+      ])
+    } catch (error) {
+      console.error('載入資料失敗', error)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  onMounted(() => {
+    loadAllData()
+    // 處理必填欄位的紅色星號
+    styleRequiredAsterisks()
   })
 
-  const specCategories = computed(() => {
-    if (!form.mainCategory || !categories[form.mainCategory]) {
-      return []
-    }
-    const specs = categories[form.mainCategory].specs
-    return Object.entries(specs).map(([code, name]) => ({
-      title: `${code} - ${name}`,
-      value: code,
-    }))
-  })
-
-  const suppliers = [
-    { title: '供應商A', value: 'SUP001' },
-    { title: '供應商B', value: 'SUP002' },
-    { title: '供應商C', value: 'SUP003' },
-  ]
-
-  const materials = [
-    'Steel',
-    'Stainless Steel',
-    'Brass',
-    'Zinc Alloy (Zamak)',
-    'Aluminum',
-    'Plastic',
-    'Wood',
-    'Others',
-  ]
-
-  const surfaceFinishes = [
-    'Chrome Plated',
-    'Nickel Plated',
-    'Zinc Plated',
-    'Powder Coating',
-    'Anodized',
-    'Natural',
-  ]
+  // 處理必填欄位的紅色星號
+  function styleRequiredAsterisks () {
+    // 使用 nextTick 確保 DOM 已渲染
+    setTimeout(() => {
+      const labels = document.querySelectorAll('.v-field-label')
+      for (const label of labels) {
+        if (label.textContent && label.textContent.includes('*')) {
+          // 創建一個 span 來包裹星號
+          const text = label.textContent.trim()
+          const asteriskIndex = text.indexOf('*')
+          if (asteriskIndex !== -1) {
+            const beforeAsterisk = text.slice(0, asteriskIndex)
+            const asterisk = text.slice(asteriskIndex)
+            // 清空 label 內容
+            label.innerHTML = ''
+            // 添加文字部分
+            if (beforeAsterisk) {
+              label.append(document.createTextNode(beforeAsterisk))
+            }
+            // 添加紅色星號
+            const asteriskSpan = document.createElement('span')
+            asteriskSpan.textContent = asterisk
+            asteriskSpan.style.color = '#f44336'
+            asteriskSpan.style.fontWeight = 'bold'
+            label.append(asteriskSpan)
+          }
+        }
+      }
+    }, 100)
+  }
 
   const form = reactive({
     mainCategory: '',
@@ -414,16 +431,23 @@
     required: value => !!value || '此欄位為必填',
   }
 
-  function handleMainCategoryChange () {
+  async function handleMainCategoryChange () {
     form.subCategory = ''
     form.specCategory = ''
     form.itemCode = ''
-    loadDefaultPackaging()
+    await loadSubCategories()
+    await loadSpecCategories()
+    await loadDefaultPackaging()
+    // 重新處理星號樣式
+    setTimeout(() => styleRequiredAsterisks(), 50)
   }
 
-  function handleSubCategoryChange () {
+  async function handleSubCategoryChange () {
     form.specCategory = ''
     form.itemCode = ''
+    await loadSpecCategories()
+    // 重新處理星號樣式
+    setTimeout(() => styleRequiredAsterisks(), 50)
   }
 
   function handleSpecCategoryChange () {
@@ -443,20 +467,57 @@
     }
   }
 
-  function loadDefaultPackaging () {
-    if (form.mainCategory) {
-      const defaults = packagingStore.getDefaultOptions(form.mainCategory)
-      if (defaults.productPackaging) {
+  async function loadDefaultPackaging () {
+    if (!form.mainCategory) {
+      return
+    }
+
+    try {
+      // 從 Supabase 讀取預設包裝選項
+      const defaults = await packagingService.getCategoryDefaults(form.mainCategory)
+
+      // 將 Supabase 返回的格式轉換成表單需要的格式
+      // Supabase 返回格式: { categoryCode: [optionCode, ...] }
+      // 表單需要格式: form.packaging.categoryCode.options = [optionCode, ...]
+      if (defaults.productPackaging && Array.isArray(defaults.productPackaging)) {
         form.packaging.productPackaging.options = defaults.productPackaging
       }
-      if (defaults.accessoriesContent) {
+      if (defaults.accessoriesContent && Array.isArray(defaults.accessoriesContent)) {
         form.packaging.accessoriesContent.options = defaults.accessoriesContent
       }
-      if (defaults.innerBox) {
+      if (defaults.accessories && Array.isArray(defaults.accessories)) {
+        form.packaging.accessories.options = defaults.accessories
+      }
+      if (defaults.innerBox && Array.isArray(defaults.innerBox)) {
         form.packaging.innerBox.options = defaults.innerBox
       }
-      if (defaults.outerBox) {
+      if (defaults.outerBox && Array.isArray(defaults.outerBox)) {
         form.packaging.outerBox.options = defaults.outerBox
+      }
+      if (defaults.transport && Array.isArray(defaults.transport)) {
+        form.packaging.transport.options = defaults.transport
+      }
+      if (defaults.container && Array.isArray(defaults.container)) {
+        form.packaging.container.options = defaults.container
+      }
+      if (defaults.other && Array.isArray(defaults.other)) {
+        form.packaging.other.options = defaults.other
+      }
+    } catch (error) {
+      console.error('載入預設包裝選項失敗', error)
+      // 如果 Supabase 載入失敗，回退到 store 中的預設值
+      const fallbackDefaults = packagingStore.getDefaultOptions(form.mainCategory)
+      if (fallbackDefaults.productPackaging) {
+        form.packaging.productPackaging.options = fallbackDefaults.productPackaging
+      }
+      if (fallbackDefaults.accessoriesContent) {
+        form.packaging.accessoriesContent.options = fallbackDefaults.accessoriesContent
+      }
+      if (fallbackDefaults.innerBox) {
+        form.packaging.innerBox.options = fallbackDefaults.innerBox
+      }
+      if (fallbackDefaults.outerBox) {
+        form.packaging.outerBox.options = fallbackDefaults.outerBox
       }
     }
   }
@@ -488,15 +549,18 @@
         surfaceFinish: form.surfaceFinish,
         dimensions: form.dimensions,
         packaging: form.packaging,
-        applicant: authStore.currentUser?.username || 'Guest User',
       }
 
-      const application = applicationsStore.addApplication(applicationData)
-      await swal.success(`申請單號：${application.id}\n料號：${application.itemCode}`, '申請已提交！')
+      // 提交到 Supabase
+      const application = await applicationsService.createApplication(applicationData)
+      await swal.success(`申請單號：${application.id}\n料號：${application.item_code}`, '申請已提交！')
       clearForm()
+      // 跳轉到審核管理頁面
+      router.push({ path: '/', query: { tab: 'review' } })
     } catch (error) {
       console.error('提交申請失敗', error)
-      await swal.error('提交申請時發生錯誤')
+      const errorMessage = error.message || '提交申請時發生錯誤'
+      await swal.error(errorMessage)
     } finally {
       submitting.value = false
     }
@@ -579,5 +643,34 @@
 
 .gap-4 {
   gap: 16px;
+}
+
+// 必填欄位的紅色星號
+// Vuetify 3 會在有 required 屬性或 rules 時自動添加星號元素
+:deep(.v-label__asterisk) {
+  color: #f44336 !important;
+}
+
+// 針對不同狀態的 label
+:deep(.v-label .v-label__asterisk) {
+  color: #f44336 !important;
+}
+
+:deep(.v-field-label .v-label__asterisk) {
+  color: #f44336 !important;
+}
+
+:deep(.v-field-label--floating .v-label__asterisk) {
+  color: #f44336 !important;
+}
+
+// 針對 v-field 內的星號
+:deep(.v-field .v-field-label .v-label__asterisk) {
+  color: #f44336 !important;
+}
+
+// 針對 v-input 內的星號
+:deep(.v-input .v-label__asterisk) {
+  color: #f44336 !important;
 }
 </style>
