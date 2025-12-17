@@ -39,7 +39,7 @@
               {{ authStore.currentUser?.username }}
             </v-list-item-title>
             <v-list-item-subtitle>
-              {{ authStore.currentUser?.role }}
+              {{ getRoleText(authStore.currentUser?.role) }}
             </v-list-item-subtitle>
           </v-list-item>
           <v-divider />
@@ -69,6 +69,18 @@
 
   const router = useRouter()
   const authStore = useAuthStore()
+
+  /**
+   * 將角色代碼轉換為中文顯示
+   */
+  function getRoleText (role) {
+    const roleMap = {
+      admin: '系統管理員',
+      approver: '審核人員',
+      applicant: '申請人員',
+    }
+    return roleMap[role] || role || '未知'
+  }
 
   function handleLogout () {
     authStore.logout()

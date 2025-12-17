@@ -77,6 +77,27 @@ export default {
   },
 
   /**
+   * 根據 ID 取得分類
+   */
+  async getCategoryById (id) {
+    if (!isSupabaseAvailable()) {
+      throw new Error('Supabase 客戶端未初始化')
+    }
+
+    const { data, error } = await supabase
+      .from('product_categories')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) {
+      throw error
+    }
+
+    return data
+  },
+
+  /**
    * 取得完整分類樹（大類、中類、小類）
    */
   async getCategoryTree () {

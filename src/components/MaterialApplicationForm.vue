@@ -22,6 +22,7 @@
                 v-model="form.mainCategory"
                 :items="mainCategories"
                 label="產品大類 *"
+                placeholder="請選擇"
                 required
                 :rules="[rules.required]"
                 variant="outlined"
@@ -34,6 +35,7 @@
                 :disabled="!form.mainCategory"
                 :items="subCategories"
                 label="產品中類 *"
+                placeholder="請選擇"
                 required
                 :rules="[rules.required]"
                 variant="outlined"
@@ -46,6 +48,7 @@
                 :disabled="!form.subCategory"
                 :items="specCategories"
                 label="產品小類 *"
+                placeholder="請選擇"
                 required
                 :rules="[rules.required]"
                 variant="outlined"
@@ -98,6 +101,7 @@
                 v-model="form.supplier"
                 :items="suppliers"
                 label="供應商"
+                placeholder="請選擇"
                 variant="outlined"
               />
             </v-col>
@@ -106,6 +110,7 @@
                 v-model="form.material"
                 :items="materials"
                 label="基本材質 *"
+                placeholder="請選擇"
                 required
                 :rules="[rules.required]"
                 variant="outlined"
@@ -116,6 +121,7 @@
                 v-model="form.surfaceFinish"
                 :items="surfaceFinishes"
                 label="表面處理"
+                placeholder="請選擇"
                 variant="outlined"
               />
             </v-col>
@@ -399,16 +405,16 @@
   }
 
   const form = reactive({
-    mainCategory: '',
-    subCategory: '',
-    specCategory: '',
+    mainCategory: null,
+    subCategory: null,
+    specCategory: null,
     itemCode: '',
     itemNameCN: '',
     itemNameEN: '',
     customerRef: '',
-    supplier: '',
-    material: '',
-    surfaceFinish: '',
+    supplier: null,
+    material: null,
+    surfaceFinish: null,
     dimensions: {
       length: null,
       width: null,
@@ -432,8 +438,8 @@
   }
 
   async function handleMainCategoryChange () {
-    form.subCategory = ''
-    form.specCategory = ''
+    form.subCategory = null
+    form.specCategory = null
     form.itemCode = ''
     await loadSubCategories()
     await loadSpecCategories()
@@ -443,7 +449,7 @@
   }
 
   async function handleSubCategoryChange () {
-    form.specCategory = ''
+    form.specCategory = null
     form.itemCode = ''
     await loadSpecCategories()
     // 重新處理星號樣式
@@ -585,16 +591,16 @@
 
   function clearForm () {
     Object.assign(form, {
-      mainCategory: '',
-      subCategory: '',
-      specCategory: '',
+      mainCategory: null,
+      subCategory: null,
+      specCategory: null,
       itemCode: '',
       itemNameCN: '',
       itemNameEN: '',
       customerRef: '',
-      supplier: '',
-      material: '',
-      surfaceFinish: '',
+      supplier: null,
+      material: null,
+      surfaceFinish: null,
       dimensions: {
         length: null,
         width: null,

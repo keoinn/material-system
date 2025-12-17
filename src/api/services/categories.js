@@ -45,6 +45,15 @@ export const categoriesService = {
   },
 
   /**
+   * 根據 ID 取得分類
+   * @param {number} id - 分類 ID
+   * @returns {Promise<Object>}
+   */
+  async getCategoryById (id) {
+    return getImplementation().getCategoryById(id)
+  },
+
+  /**
    * 取得完整分類樹（大類、中類、小類）
    * @returns {Promise<Object>}
    */

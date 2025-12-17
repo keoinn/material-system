@@ -60,19 +60,22 @@ export const useAuthStore = defineStore('auth', () => {
         isAuthenticated.value = true
         token.value = result.session?.access_token || null
 
-      // 載入 user_profile
-      await loadUserProfile(result.user.id)
+        // 載入 user_profile
+        await loadUserProfile(result.user.id)
 
-      // 檢查用戶是否已啟用
-      if (userProfile.value && !userProfile.value.is_active) {
-        await logout()
-        return {
-          success: false,
-          message: '您的帳號尚未啟用，請等待管理員審核後再登入',
+        // 檢查用戶是否已啟用
+        if (userProfile.value && !userProfile.value.is_active) {
+          await logout()
+          return {
+            success: false,
+            message: '您的帳號尚未啟用，請等待管理員審核後再登入',
+          }
         }
-      }
 
-      return { success: true, user: currentUser.value }
+        // 更新最後登入時間和 IP
+        await updateLastLogin(result.user.id)
+
+        return { success: true, user: currentUser.value }
       }
 
       return { success: false, message: '登入失敗' }
@@ -102,6 +105,49 @@ export const useAuthStore = defineStore('auth', () => {
       isAuthenticated.value = false
       token.value = null
       loading.value = false
+    }
+  }
+
+  /**
+   * 更新最後登入時間和 IP
+   */
+  async function updateLastLogin (userId) {
+    if (!isSupabaseAvailable() || !userId) {
+      return
+    }
+
+    try {
+      // 獲取 IP 地址（使用第三方 API）
+      let ipAddress = null
+      try {
+        // 使用 ipify.org API 獲取 IP 地址（免費且無需認證）
+        const response = await fetch('https://api.ipify.org?format=json')
+        if (response.ok) {
+          const data = await response.json()
+          ipAddress = data.ip || null
+        }
+      } catch (error) {
+        console.warn('獲取 IP 地址失敗', error)
+        // IP 獲取失敗不影響登入流程，設為 null
+        ipAddress = null
+      }
+
+      // 更新 user_profiles
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          last_login: new Date().toISOString(),
+          last_login_ip: ipAddress,
+        })
+        .eq('id', userId)
+
+      if (error) {
+        console.warn('更新最後登入時間失敗', error)
+        // 不拋出錯誤，避免影響登入流程
+      }
+    } catch (error) {
+      console.error('更新最後登入時間錯誤', error)
+      // 不拋出錯誤，避免影響登入流程
     }
   }
 

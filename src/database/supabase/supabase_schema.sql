@@ -466,6 +466,13 @@ INSERT INTO system_options (module, cate, parent_key, key, value, label, "desc")
 ('user_management', 'userRole', NULL, 'applicant', 'applicant', '申請人員', '可提交申請')
 ON CONFLICT (module, cate, COALESCE(parent_key, ''), key) DO NOTHING;
 
+-- 6.4.1 認證模組角色選項
+INSERT INTO system_options (module, cate, parent_key, key, value, label, "desc") VALUES
+('auth', 'role', NULL, 'admin', 'admin', '系統管理員', '擁有所有權限，可管理系統設定和使用者'),
+('auth', 'role', NULL, 'approver', 'approver', '審核人員', '可審核和核准物料申請'),
+('auth', 'role', NULL, 'applicant', 'applicant', '申請人員', '可提交物料申請')
+ON CONFLICT (module, cate, COALESCE(parent_key, ''), key) DO NOTHING;
+
 -- 6.5 流水號位數選項
 INSERT INTO system_options (module, cate, parent_key, key, value, label, "desc") VALUES
 ('system_settings', 'serialDigits', NULL, '4', '4', '4位數', '0001-9999'),

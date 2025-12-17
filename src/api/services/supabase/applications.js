@@ -62,11 +62,17 @@ export default {
     }
 
     if (filters.dateFrom) {
-      query = query.gte('submit_date', filters.dateFrom)
+      // 確保日期格式正確，設置為當天開始時間
+      const dateFrom = new Date(filters.dateFrom)
+      dateFrom.setHours(0, 0, 0, 0)
+      query = query.gte('submit_date', dateFrom.toISOString())
     }
 
     if (filters.dateTo) {
-      query = query.lte('submit_date', filters.dateTo)
+      // 確保日期格式正確，設置為當天結束時間
+      const dateTo = new Date(filters.dateTo)
+      dateTo.setHours(23, 59, 59, 999)
+      query = query.lte('submit_date', dateTo.toISOString())
     }
 
     if (filters.mainCategory) {
