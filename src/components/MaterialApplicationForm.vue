@@ -199,18 +199,18 @@
   import { useRouter } from 'vue-router'
   import { applicationsService } from '@/api/services/applications'
   import { categoriesService } from '@/api/services/categories'
+  import { codeCountersService } from '@/api/services/codeCounters'
   import { packagingService } from '@/api/services/packaging'
+  import { settingsService } from '@/api/services/settings'
   import { suppliersService } from '@/api/services/suppliers'
   import { systemOptionsService } from '@/api/services/systemOptions'
   import { useSwal } from '@/composables/useSwal'
-  import { useApplicationsStore } from '@/stores/applications'
   import { usePackagingStore } from '@/stores/packaging'
   import PackagingFormSection from './PackagingFormSection.vue'
 
   const swal = useSwal()
   const router = useRouter()
 
-  const applicationsStore = useApplicationsStore()
   const packagingStore = usePackagingStore()
 
   const formRef = ref(null)
@@ -454,16 +454,33 @@
     generateItemCode()
   }
 
-  function generateItemCode () {
-    if (form.mainCategory && form.subCategory && form.specCategory) {
-      const code = applicationsStore.generateItemCode(
-        form.mainCategory,
-        form.subCategory,
-        form.specCategory,
-      )
-      if (code) {
-        form.itemCode = code
-      }
+  async function generateItemCode () {
+    if (!form.mainCategory || !form.subCategory || !form.specCategory) {
+      form.itemCode = ''
+      return
+    }
+
+    try {
+      // 1. 獲取系統設定（流水號位數）
+      const settings = await settingsService.getSettings()
+      const serialDigits = settings.serialDigits || 5
+
+      // 2. 構建計數器鍵值（格式: {大類}{中類}.{小類}）
+      const counterKey = `${form.mainCategory}${form.subCategory}.${form.specCategory}`
+
+      // 3. 獲取並增加計數器
+      const counter = await codeCountersService.getAndIncrementCounter(counterKey)
+
+      // 4. 根據編碼格式生成編碼
+      // 格式: {大類}{中類}.{小類}.{流水號}
+      const serial = String(counter).padStart(serialDigits, '0')
+      const itemCode = `${form.mainCategory}${form.subCategory}.${form.specCategory}.${serial}`
+
+      form.itemCode = itemCode
+    } catch (error) {
+      console.error('生成系統編碼失敗', error)
+      await swal.error('生成系統編碼失敗', error.message || '無法生成系統編碼，請稍後再試')
+      form.itemCode = ''
     }
   }
 

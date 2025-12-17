@@ -70,7 +70,13 @@ export const applicationsService = {
    * @param {object} approvalData - 核准資料
    * @returns {Promise<Object>}
    */
-  async approveApplication (id, approvalData) {
+  async approveApplication (id, approvalData = {}) {
+    const impl = getImplementation()
+    // 如果實作有 approveApplication 方法，使用它（Supabase）
+    if (impl.approveApplication) {
+      return impl.approveApplication(id, approvalData)
+    }
+    // 否則使用通用的 updateApplication（Axios）
     const updates = {
       status: 'APPROVED',
       approval_status: 'APPROVED',
@@ -86,7 +92,13 @@ export const applicationsService = {
    * @param {object} rejectData - 退回資料
    * @returns {Promise<Object>}
    */
-  async rejectApplication (id, rejectData) {
+  async rejectApplication (id, rejectData = {}) {
+    const impl = getImplementation()
+    // 如果實作有 rejectApplication 方法，使用它（Supabase）
+    if (impl.rejectApplication) {
+      return impl.rejectApplication(id, rejectData)
+    }
+    // 否則使用通用的 updateApplication（Axios）
     const updates = {
       status: 'REJECTED',
       approval_status: 'REJECTED',

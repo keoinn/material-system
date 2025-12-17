@@ -16,9 +16,31 @@ export default {
       throw new Error('Supabase 客戶端未初始化')
     }
 
+    // 如果 applicant 是字符串（姓名），先查找匹配的用戶 ID
+    let applicantIds = null
+    if (filters.applicant && typeof filters.applicant === 'string') {
+      const { data: matchingUsers } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .ilike('username', `%${filters.applicant}%`)
+
+      if (matchingUsers && matchingUsers.length > 0) {
+        applicantIds = matchingUsers.map(u => u.id)
+      } else {
+        // 如果沒有找到匹配的用戶，返回空結果
+        return []
+      }
+    }
+
     let query = supabase
       .from('applications')
-      .select('*')
+      .select(`
+        *,
+        applicant:user_profiles!applications_applicant_id_fkey (
+          id,
+          username
+        )
+      `)
 
     // 應用篩選條件
     if (filters.status && filters.status !== 'ALL') {
@@ -30,7 +52,13 @@ export default {
     }
 
     if (filters.applicant) {
-      query = query.eq('applicant_id', filters.applicant)
+      if (applicantIds) {
+        // 使用查詢到的用戶 ID 列表
+        query = query.in('applicant_id', applicantIds)
+      } else if (typeof filters.applicant !== 'string') {
+        // 如果 applicant 是 ID，直接查詢
+        query = query.eq('applicant_id', filters.applicant)
+      }
     }
 
     if (filters.dateFrom) {
@@ -54,7 +82,11 @@ export default {
       throw error
     }
 
-    return data || []
+    // 處理申請人資訊
+    return (data || []).map(app => ({
+      ...app,
+      applicant_name: app.applicant?.username || 'Unknown',
+    }))
   },
 
   /**
@@ -67,7 +99,13 @@ export default {
 
     const { data, error } = await supabase
       .from('applications')
-      .select('*')
+      .select(`
+        *,
+        applicant:user_profiles!applications_applicant_id_fkey (
+          id,
+          username
+        )
+      `)
       .eq('id', id)
       .single()
 
@@ -75,7 +113,10 @@ export default {
       throw error
     }
 
-    return data
+    return {
+      ...data,
+      applicant_name: data.applicant?.username || 'Unknown',
+    }
   },
 
   /**
@@ -278,6 +319,124 @@ export default {
     }
 
     return data
+  },
+
+  /**
+   * 核准申請（包含審核日誌）
+   */
+  async approveApplication (id, approvalData = {}) {
+    if (!isSupabaseAvailable()) {
+      throw new Error('Supabase 客戶端未初始化')
+    }
+
+    // 獲取當前用戶
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    if (!authUser) {
+      throw new Error('用戶未登入')
+    }
+
+    // 獲取審核人資訊
+    const { data: approverProfile } = await supabase
+      .from('user_profiles')
+      .select('id, username, role')
+      .eq('id', authUser.id)
+      .single()
+
+    // 更新申請狀態
+    const updates = {
+      status: 'APPROVED',
+      approval_status: 'APPROVED',
+      approval_date: new Date().toISOString(),
+      approver_id: approvalData.approver_id || authUser.id,
+      ...approvalData,
+    }
+
+    const { data: application, error: updateError } = await supabase
+      .from('applications')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) {
+      throw updateError
+    }
+
+    // 記錄審核日誌
+    if (approverProfile) {
+      await supabase
+        .from('approval_logs')
+        .insert({
+          application_id: id,
+          action: 'APPROVE',
+          approver_id: approverProfile.id,
+          approver_name: approverProfile.username || authUser.email,
+          approver_role: approverProfile.role,
+          comment: approvalData.comment || null,
+        })
+    }
+
+    return application
+  },
+
+  /**
+   * 退回申請（包含審核日誌）
+   */
+  async rejectApplication (id, rejectData = {}) {
+    if (!isSupabaseAvailable()) {
+      throw new Error('Supabase 客戶端未初始化')
+    }
+
+    // 獲取當前用戶
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    if (!authUser) {
+      throw new Error('用戶未登入')
+    }
+
+    // 獲取審核人資訊
+    const { data: approverProfile } = await supabase
+      .from('user_profiles')
+      .select('id, username, role')
+      .eq('id', authUser.id)
+      .single()
+
+    // 更新申請狀態
+    const updates = {
+      status: 'REJECTED',
+      approval_status: 'REJECTED',
+      reject_date: new Date().toISOString(),
+      reject_reason: rejectData.reject_reason || rejectData.reason || '',
+      approver_id: rejectData.approver_id || authUser.id,
+      ...rejectData,
+    }
+
+    const { data: application, error: updateError } = await supabase
+      .from('applications')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) {
+      throw updateError
+    }
+
+    // 記錄審核日誌
+    if (approverProfile) {
+      await supabase
+        .from('approval_logs')
+        .insert({
+          application_id: id,
+          action: 'REJECT',
+          approver_id: approverProfile.id,
+          approver_name: approverProfile.username || authUser.email,
+          approver_role: approverProfile.role,
+          reason: rejectData.reject_reason || rejectData.reason || '',
+          comment: rejectData.comment || null,
+        })
+    }
+
+    return application
   },
 
   /**

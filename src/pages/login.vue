@@ -17,12 +17,13 @@ meta:
             <v-card-text>
               <v-form @submit.prevent="handleLogin">
                 <v-text-field
-                  v-model="username"
+                  v-model="identifier"
                   class="mb-4"
-                  label="使用者名稱"
+                  label="Email 或使用者名稱"
                   prepend-inner-icon="mdi-account"
                   :rules="[rules.required]"
                   variant="outlined"
+                  autocomplete="username"
                 />
 
                 <v-text-field
@@ -33,6 +34,8 @@ meta:
                   :rules="[rules.required]"
                   type="password"
                   variant="outlined"
+                  autocomplete="current-password"
+                  @keyup.enter="handleLogin"
                 />
 
                 <v-alert
@@ -40,6 +43,8 @@ meta:
                   class="mb-4"
                   type="error"
                   variant="tonal"
+                  closable
+                  @click:close="errorMessage = ''"
                 >
                   {{ errorMessage }}
                 </v-alert>
@@ -48,6 +53,7 @@ meta:
                   block
                   class="login-btn"
                   color="primary"
+                  :disabled="loading"
                   :loading="loading"
                   size="large"
                   type="submit"
@@ -58,8 +64,18 @@ meta:
 
               <div class="mt-4 text-center">
                 <small class="text-grey">
-                  提示：可使用 admin 或 user 登入（開發模式）
+                  提示：請使用 Email 或使用者名稱登入
                 </small>
+                <div class="mt-2">
+                  <v-btn
+                    color="primary"
+                    size="small"
+                    variant="text"
+                    @click="router.push('/register')"
+                  >
+                    還沒有帳號？立即註冊
+                  </v-btn>
+                </div>
               </div>
             </v-card-text>
           </v-card>
@@ -70,44 +86,44 @@ meta:
 </template>
 
 <script setup>
-  import { ref } from 'vue'
+  import { computed, ref } from 'vue'
   import { useRouter } from 'vue-router'
   import { useAuthStore } from '@/stores/auth'
 
   const router = useRouter()
   const authStore = useAuthStore()
 
-  const username = ref('')
+  const identifier = ref('')
   const password = ref('')
-  const loading = ref(false)
   const errorMessage = ref('')
+
+  const loading = computed(() => authStore.loading)
 
   const rules = {
     required: value => !!value || '此欄位為必填',
   }
 
   async function handleLogin () {
-    if (!username.value || !password.value) {
-      errorMessage.value = '請輸入使用者名稱和密碼'
+    if (!identifier.value || !password.value) {
+      errorMessage.value = '請輸入 Email/使用者名稱和密碼'
       return
     }
 
-    loading.value = true
     errorMessage.value = ''
 
     try {
-      const result = authStore.login(username.value, password.value)
+      const result = await authStore.login(identifier.value, password.value)
 
       if (result.success) {
+        // 等待一下確保狀態已更新
+        await new Promise(resolve => setTimeout(resolve, 100))
         router.push('/')
       } else {
         errorMessage.value = result.message || '登入失敗'
       }
     } catch (error) {
-      errorMessage.value = '登入時發生錯誤'
+      errorMessage.value = error.message || '登入時發生錯誤'
       console.error('Login error:', error)
-    } finally {
-      loading.value = false
     }
   }
 </script>

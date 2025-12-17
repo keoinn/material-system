@@ -11,8 +11,16 @@
         :items="pendingApplications"
         :loading="loading"
       >
-        <template #item.submitDate="{ item }">
-          {{ formatDate(item.submitDate) }}
+        <template #item.submit_date="{ item }">
+          {{ formatDate(item.submit_date || item.submitDate) }}
+        </template>
+
+        <template #item.item_code="{ item }">
+          {{ item.item_code || item.itemCode }}
+        </template>
+
+        <template #item.item_name_cn="{ item }">
+          {{ item.item_name_cn || item.itemNameCN }}
         </template>
 
         <template #item.status="{ item }">
@@ -102,44 +110,44 @@
                       <div class="detail-item">
                         <span class="detail-label">料號：</span>
                         <span class="detail-value font-weight-bold text-primary">
-                          {{ selectedApplication.itemCode }}
+                          {{ selectedApplication.item_code || selectedApplication.itemCode }}
                         </span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">中文名稱：</span>
-                        <span class="detail-value">{{ selectedApplication.itemNameCN }}</span>
+                        <span class="detail-value">{{ selectedApplication.item_name_cn || selectedApplication.itemNameCN }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">英文名稱：</span>
-                        <span class="detail-value">{{ selectedApplication.itemNameEN }}</span>
+                        <span class="detail-value">{{ selectedApplication.item_name_en || selectedApplication.itemNameEN }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">材質：</span>
-                        <span class="detail-value">{{ selectedApplication.material }}</span>
+                        <span class="detail-value">{{ selectedApplication.material || 'N/A' }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">表面處理：</span>
-                        <span class="detail-value">{{ selectedApplication.surfaceFinish || 'N/A' }}</span>
+                        <span class="detail-value">{{ selectedApplication.surface_finish || selectedApplication.surfaceFinish || 'N/A' }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">申請人：</span>
-                        <span class="detail-value">{{ selectedApplication.applicant }}</span>
+                        <span class="detail-value">{{ selectedApplication.applicant || 'Unknown' }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">申請日期：</span>
-                        <span class="detail-value">{{ formatDate(selectedApplication.submitDate) }}</span>
+                        <span class="detail-value">{{ formatDate(selectedApplication.submit_date || selectedApplication.submitDate) }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -243,14 +251,14 @@
 </template>
 
 <script setup>
-  import { computed, ref } from 'vue'
+  import { computed, onMounted, ref } from 'vue'
+  import { applicationsService } from '@/api/services/applications'
+  import { packagingService } from '@/api/services/packaging'
+  import { categoriesService } from '@/api/services/categories'
   import { useSwal } from '@/composables/useSwal'
-  import { useApplicationsStore } from '@/stores/applications'
   import { useAuthStore } from '@/stores/auth'
 
   const swal = useSwal()
-
-  const applicationsStore = useApplicationsStore()
   const authStore = useAuthStore()
 
   const loading = ref(false)
@@ -259,18 +267,41 @@
   const selectedApplication = ref(null)
   const rejectReason = ref('')
   const rejectApplicationId = ref(null)
+  const applications = ref([])
 
-  const pendingApplications = computed(() => applicationsStore.pendingApplications)
+  const pendingApplications = computed(() => applications.value)
 
   const headers = [
-    { title: '申請日期', key: 'submitDate', sortable: true },
+    { title: '申請日期', key: 'submit_date', sortable: true },
     { title: '申請單號', key: 'id', sortable: true },
-    { title: '料號', key: 'itemCode', sortable: true },
-    { title: '料件說明', key: 'itemNameCN', sortable: true },
+    { title: '料號', key: 'item_code', sortable: true },
+    { title: '料件說明', key: 'item_name_cn', sortable: true },
     { title: '申請人', key: 'applicant', sortable: true },
     { title: '狀態', key: 'status', sortable: true },
     { title: '操作', key: 'actions', sortable: false },
   ]
+
+  // 載入待審核申請列表
+  async function loadPendingApplications () {
+    loading.value = true
+    try {
+      const data = await applicationsService.getApplications({ status: 'PENDING' })
+      // 轉換數據格式以符合組件需求
+      applications.value = data.map((app) => ({
+        ...app,
+        submitDate: app.submit_date,
+        itemCode: app.item_code,
+        itemNameCN: app.item_name_cn,
+        itemNameEN: app.item_name_en,
+        applicant: app.applicant_name || app.applicant?.username || app.applicant?.email || 'Unknown',
+      }))
+    } catch (error) {
+      console.error('載入待審核申請失敗', error)
+      await swal.error('載入待審核申請失敗，請重新整理頁面')
+    } finally {
+      loading.value = false
+    }
+  }
 
   function formatDate (dateString) {
     if (!dateString) return ''
@@ -312,9 +343,21 @@
   async function approveApplication (id) {
     const result = await swal.confirm('確定要核准此申請嗎？', '確認核准')
     if (result.isConfirmed) {
-      const approver = authStore.currentUser?.username || 'System'
-      applicationsStore.approveApplication(id, approver)
-      await swal.success('申請已核准！')
+      loading.value = true
+      try {
+        const approverId = authStore.currentUser?.id
+        await applicationsService.approveApplication(id, {
+          approver_id: approverId,
+        })
+        await swal.success('申請已核准！')
+        // 重新載入列表
+        await loadPendingApplications()
+      } catch (error) {
+        console.error('核准申請失敗', error)
+        await swal.error('核准申請失敗，請稍後再試')
+      } finally {
+        loading.value = false
+      }
     }
   }
 
@@ -330,17 +373,88 @@
       return
     }
 
-    const approver = authStore.currentUser?.username || 'System'
-    applicationsStore.rejectApplication(rejectApplicationId.value, rejectReason.value, approver)
-    rejectDialog.value = false
-    rejectReason.value = ''
-    await swal.success('申請已退回！')
+    loading.value = true
+    try {
+      const approverId = authStore.currentUser?.id
+      await applicationsService.rejectApplication(rejectApplicationId.value, {
+        reject_reason: rejectReason.value,
+        approver_id: approverId,
+      })
+      rejectDialog.value = false
+      rejectReason.value = ''
+      await swal.success('申請已退回！')
+      // 重新載入列表
+      await loadPendingApplications()
+    } catch (error) {
+      console.error('退回申請失敗', error)
+      await swal.error('退回申請失敗，請稍後再試')
+    } finally {
+      loading.value = false
+    }
   }
 
-  function viewDetails (id) {
-    selectedApplication.value = applicationsStore.getApplication(id)
-    detailDialog.value = true
+  async function viewDetails (id) {
+    loading.value = true
+    try {
+      // 載入申請詳情
+      const application = await applicationsService.getApplication(id)
+      
+      // 載入包裝數據
+      const packagingData = await packagingService.getApplicationPackaging(id)
+      
+      // 轉換包裝數據格式
+      const packaging = {}
+      for (const item of packagingData) {
+        const categoryCode = item.packaging_categories?.code
+        if (!categoryCode) continue
+
+        if (!packaging[categoryCode]) {
+          packaging[categoryCode] = {
+            options: [],
+            description: '',
+          }
+        }
+
+        const optionName = item.packaging_options?.name || item.packaging_options?.code
+        if (optionName) {
+          packaging[categoryCode].options.push(optionName)
+        }
+
+        if (item.description) {
+          packaging[categoryCode].description = item.description
+        }
+      }
+
+      // 載入申請人資訊
+      const applicantName = application.applicant_name || 
+                           application.applicant?.username || 
+                           application.applicant?.email || 
+                           'Unknown'
+
+      selectedApplication.value = {
+        ...application,
+        submitDate: application.submit_date,
+        itemCode: application.item_code,
+        itemNameCN: application.item_name_cn,
+        itemNameEN: application.item_name_en,
+        surfaceFinish: application.surface_finish,
+        applicant: applicantName,
+        packaging,
+      }
+
+      detailDialog.value = true
+    } catch (error) {
+      console.error('載入申請詳情失敗', error)
+      await swal.error('載入申請詳情失敗，請稍後再試')
+    } finally {
+      loading.value = false
+    }
   }
+
+  // 組件掛載時載入數據
+  onMounted(() => {
+    loadPendingApplications()
+  })
 </script>
 
 <style scoped lang="scss">

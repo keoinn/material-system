@@ -52,10 +52,19 @@
         </v-row>
       </div>
 
+      <v-progress-linear
+        v-if="loading"
+        indeterminate
+        color="primary"
+        class="mb-4"
+      />
+
       <div class="d-flex justify-center gap-4 mt-4">
         <v-btn
           color="primary"
           size="large"
+          :loading="loading"
+          :disabled="loading"
           @click="saveSettings"
         >
           儲存設定
@@ -63,6 +72,8 @@
         <v-btn
           color="warning"
           size="large"
+          :loading="loading"
+          :disabled="loading"
           @click="resetSettings"
         >
           恢復預設
@@ -73,20 +84,19 @@
 </template>
 
 <script setup>
-  import { computed, reactive, ref, watch } from 'vue'
+  import { onMounted, reactive, ref } from 'vue'
   import { useSwal } from '@/composables/useSwal'
-  import { useSettingsStore } from '@/stores/settings'
+  import { settingsService } from '@/api/services/settings'
 
   const swal = useSwal()
 
-  const settingsStore = useSettingsStore()
-
   const codeFormat = ref('{大類}{中類}.{小類}.{流水號}')
+  const loading = ref(false)
 
   const localSettings = reactive({
-    serialDigits: settingsStore.settings.serialDigits,
-    autoApprove: settingsStore.settings.autoApprove,
-    emailNotify: settingsStore.settings.emailNotify,
+    serialDigits: 5,
+    autoApprove: false,
+    emailNotify: true,
   })
 
   const serialDigitOptions = [
@@ -100,36 +110,68 @@
     { title: '關閉', value: false },
   ]
 
+  // 載入設定
+  async function loadSettings () {
+    loading.value = true
+    try {
+      const settings = await settingsService.getSettings()
+      Object.assign(localSettings, {
+        serialDigits: settings.serialDigits ?? 5,
+        autoApprove: settings.autoApprove ?? false,
+        emailNotify: settings.emailNotify ?? true,
+      })
+    } catch (error) {
+      console.error('載入設定失敗', error)
+      await swal.error('載入設定失敗', error.message || '無法取得系統設定')
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function saveSettings () {
-    const success = settingsStore.saveSettings(localSettings)
-    await (success ? swal.success('設定已儲存成功！') : swal.error('儲存設定時發生錯誤'))
+    loading.value = true
+    try {
+      await settingsService.updateSettings({
+        serialDigits: localSettings.serialDigits,
+        autoApprove: localSettings.autoApprove,
+        emailNotify: localSettings.emailNotify,
+      })
+      await swal.success('設定已儲存成功！')
+    } catch (error) {
+      console.error('儲存設定失敗', error)
+      await swal.error('儲存設定失敗', error.message || '儲存設定時發生錯誤')
+    } finally {
+      loading.value = false
+    }
   }
 
   async function resetSettings () {
     const result = await swal.confirm('確定要恢復預設設定嗎？', '確認重置')
     if (result.isConfirmed) {
-      settingsStore.resetSettings()
-      Object.assign(localSettings, {
-        serialDigits: settingsStore.settings.serialDigits,
-        autoApprove: settingsStore.settings.autoApprove,
-        emailNotify: settingsStore.settings.emailNotify,
-      })
-      await swal.success('已恢復預設設定！')
+      loading.value = true
+      try {
+        // 恢復預設值
+        const defaultSettings = {
+          serialDigits: 5,
+          autoApprove: false,
+          emailNotify: true,
+        }
+        await settingsService.updateSettings(defaultSettings)
+        Object.assign(localSettings, defaultSettings)
+        await swal.success('已恢復預設設定！')
+      } catch (error) {
+        console.error('恢復預設設定失敗', error)
+        await swal.error('恢復預設設定失敗', error.message || '恢復預設設定時發生錯誤')
+      } finally {
+        loading.value = false
+      }
     }
   }
 
-  // 監聽設定變更
-  watch(
-    () => settingsStore.settings,
-    newSettings => {
-      Object.assign(localSettings, {
-        serialDigits: newSettings.serialDigits,
-        autoApprove: newSettings.autoApprove,
-        emailNotify: newSettings.emailNotify,
-      })
-    },
-    { deep: true },
-  )
+  // 組件掛載時載入設定
+  onMounted(() => {
+    loadSettings()
+  })
 </script>
 
 <style scoped lang="scss">

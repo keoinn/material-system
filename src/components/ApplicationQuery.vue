@@ -46,6 +46,8 @@
           <v-btn
             color="primary"
             size="large"
+            :loading="loading"
+            :disabled="loading"
             @click="searchApplications"
           >
             查詢
@@ -61,17 +63,24 @@
       </v-form>
 
       <!-- 查詢結果 -->
-      <v-card v-if="queryResults.length > 0" class="mt-4">
+      <v-card v-if="queryResults.length > 0 || loading" class="mt-4">
         <v-card-title>查詢結果（共 {{ queryResults.length }} 筆）</v-card-title>
         <v-card-text>
+          <v-progress-linear
+            v-if="loading"
+            indeterminate
+            color="primary"
+            class="mb-4"
+          />
           <v-data-table
+            v-if="!loading"
             class="elevation-1"
             :headers="headers"
             :items="queryResults"
             :items-per-page="10"
           >
-            <template #item.submitDate="{ item }">
-              {{ formatDate(item.submitDate) }}
+            <template #item.submit_date="{ item }">
+              {{ formatDate(item.submit_date) }}
             </template>
 
             <template #item.status="{ item }">
@@ -88,6 +97,7 @@
               <v-btn
                 color="info"
                 size="small"
+                :loading="loadingDetails && selectedApplicationId === item.id"
                 @click="viewDetails(item.id)"
               >
                 詳情
@@ -141,44 +151,44 @@
                       <div class="detail-item">
                         <span class="detail-label">料號：</span>
                         <span class="detail-value font-weight-bold text-primary">
-                          {{ selectedApplication.itemCode }}
+                          {{ selectedApplication.item_code }}
                         </span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">中文名稱：</span>
-                        <span class="detail-value">{{ selectedApplication.itemNameCN }}</span>
+                        <span class="detail-value">{{ selectedApplication.item_name_cn }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">英文名稱：</span>
-                        <span class="detail-value">{{ selectedApplication.itemNameEN }}</span>
+                        <span class="detail-value">{{ selectedApplication.item_name_en || 'N/A' }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">材質：</span>
-                        <span class="detail-value">{{ selectedApplication.material }}</span>
+                        <span class="detail-value">{{ selectedApplication.material || 'N/A' }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">表面處理：</span>
-                        <span class="detail-value">{{ selectedApplication.surfaceFinish || 'N/A' }}</span>
+                        <span class="detail-value">{{ selectedApplication.surface_finish || 'N/A' }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">申請人：</span>
-                        <span class="detail-value">{{ selectedApplication.applicant }}</span>
+                        <span class="detail-value">{{ selectedApplication.applicant_name || 'N/A' }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">申請日期：</span>
-                        <span class="detail-value">{{ formatDate(selectedApplication.submitDate) }}</span>
+                        <span class="detail-value">{{ formatDate(selectedApplication.submit_date) }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -263,14 +273,19 @@
 
 <script setup>
   import { reactive, ref } from 'vue'
-  import { useApplicationsStore } from '@/stores/applications'
+  import { applicationsService } from '@/api/services/applications'
+  import { packagingService } from '@/api/services/packaging'
+  import { useSwal } from '@/composables/useSwal'
 
-  const applicationsStore = useApplicationsStore()
+  const swal = useSwal()
 
   const formRef = ref(null)
   const queryResults = ref([])
   const detailDialog = ref(false)
   const selectedApplication = ref(null)
+  const loading = ref(false)
+  const loadingDetails = ref(false)
+  const selectedApplicationId = ref(null)
 
   const filters = reactive({
     itemCode: '',
@@ -287,11 +302,11 @@
   ]
 
   const headers = [
-    { title: '申請日期', key: 'submitDate', sortable: true },
+    { title: '申請日期', key: 'submit_date', sortable: true },
     { title: '申請單號', key: 'id', sortable: true },
-    { title: '料號', key: 'itemCode', sortable: true },
-    { title: '料件說明', key: 'itemNameCN', sortable: true },
-    { title: '申請人', key: 'applicant', sortable: true },
+    { title: '料號', key: 'item_code', sortable: true },
+    { title: '料件說明', key: 'item_name_cn', sortable: true },
+    { title: '申請人', key: 'applicant_name', sortable: true },
     { title: '狀態', key: 'status', sortable: true },
     { title: '操作', key: 'actions', sortable: false },
   ]
@@ -333,8 +348,32 @@
     return names[key] || key
   }
 
-  function searchApplications () {
-    queryResults.value = applicationsStore.searchApplications(filters)
+  async function searchApplications () {
+    loading.value = true
+    try {
+      const queryFilters = {}
+      if (filters.itemCode) {
+        queryFilters.itemCode = filters.itemCode
+      }
+      if (filters.applicant) {
+        queryFilters.applicant = filters.applicant
+      }
+      if (filters.status) {
+        queryFilters.status = filters.status
+      }
+      if (filters.dateFrom) {
+        queryFilters.dateFrom = filters.dateFrom
+      }
+
+      const results = await applicationsService.getApplications(queryFilters)
+      queryResults.value = results || []
+    } catch (error) {
+      console.error('查詢申請記錄失敗', error)
+      await swal.error('查詢失敗', error.message || '無法取得申請記錄')
+      queryResults.value = []
+    } finally {
+      loading.value = false
+    }
   }
 
   function clearQueryForm () {
@@ -348,9 +387,70 @@
     formRef.value?.reset()
   }
 
-  function viewDetails (id) {
-    selectedApplication.value = applicationsStore.getApplication(id)
-    detailDialog.value = true
+  async function viewDetails (id) {
+    loadingDetails.value = true
+    selectedApplicationId.value = id
+    try {
+      // 獲取申請詳情
+      const application = await applicationsService.getApplication(id)
+      
+      // 獲取包裝數據
+      const packagingData = await packagingService.getApplicationPackaging(id)
+      
+      // 轉換包裝數據格式
+      const packaging = transformPackagingData(packagingData)
+      
+      selectedApplication.value = {
+        ...application,
+        packaging,
+      }
+      detailDialog.value = true
+    } catch (error) {
+      console.error('獲取申請詳情失敗', error)
+      await swal.error('載入失敗', error.message || '無法取得申請詳情')
+    } finally {
+      loadingDetails.value = false
+      selectedApplicationId.value = null
+    }
+  }
+
+  // 轉換包裝數據格式：從 Supabase 格式轉換為組件期望的格式
+  function transformPackagingData (packagingData) {
+    const result = {
+      productPackaging: { options: [], description: '' },
+      accessoriesContent: { options: [], description: '' },
+      accessories: { options: [], description: '' },
+      innerBox: { options: [], description: '' },
+      outerBox: { options: [], description: '' },
+      transport: { options: [], description: '' },
+      container: { options: [], description: '' },
+      other: { options: [], description: '' },
+    }
+
+    if (!packagingData || !Array.isArray(packagingData)) {
+      return result
+    }
+
+    // 按包裝類別分組（category code 直接對應 result 的 key）
+    for (const item of packagingData) {
+      const categoryCode = item.packaging_categories?.code
+      if (!categoryCode || !result[categoryCode]) {
+        continue
+      }
+
+      // 獲取選項名稱
+      const optionName = item.packaging_options?.name || item.packaging_options?.code
+      if (optionName && !result[categoryCode].options.includes(optionName)) {
+        result[categoryCode].options.push(optionName)
+      }
+
+      // 設置描述（如果有多個描述，使用第一個非空的）
+      if (item.description && !result[categoryCode].description) {
+        result[categoryCode].description = item.description
+      }
+    }
+
+    return result
   }
 </script>
 

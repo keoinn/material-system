@@ -625,11 +625,12 @@ CREATE TRIGGER update_user_profiles_updated_at
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.user_profiles (id, username, role)
+  INSERT INTO public.user_profiles (id, username, role, is_active)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'username', NEW.email),
-    COALESCE(NEW.raw_user_meta_data->>'role', 'applicant')
+    COALESCE(NEW.raw_user_meta_data->>'role', 'applicant'),
+    FALSE  -- 新註冊用戶預設未啟用，需等待管理員審核
   );
   RETURN NEW;
 END;
