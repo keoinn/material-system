@@ -75,7 +75,17 @@
             :headers="previewHeaders"
             :items="previewData"
             :items-per-page="10"
-          />
+          >
+            <template #item.status="{ item }">
+              <v-chip
+                :color="getStatusColor(item.status)"
+                size="small"
+                variant="flat"
+              >
+                {{ getStatusText(item.status) }}
+              </v-chip>
+            </template>
+          </v-data-table>
         </v-card-text>
       </v-card>
     </v-card-text>
@@ -419,6 +429,24 @@
     } finally {
       exporting.value = false
     }
+  }
+
+  function getStatusColor (status) {
+    const colors = {
+      PENDING: 'warning',
+      APPROVED: 'success',
+      REJECTED: 'error',
+    }
+    return colors[status] || 'grey'
+  }
+
+  function getStatusText (status) {
+    const texts = {
+      PENDING: '待審核',
+      APPROVED: '已核准',
+      REJECTED: '已退回',
+    }
+    return texts[status] || status
   }
 
   async function previewExport () {
