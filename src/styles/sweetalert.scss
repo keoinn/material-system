@@ -89,3 +89,9 @@
   }
 }
 
+// 確保 SweetAlert 顯示在 Vuetify 對話框之上
+// Vuetify 對話框的 z-index 通常是 2000-3000
+.swal2-container {
+  z-index: 10000 !important;
+}
+

@@ -11,6 +11,10 @@ const buttonStyle = {
     confirmButton: 'swal2-confirm-custom',
     cancelButton: 'swal2-cancel-custom',
   },
+  // 允許點擊背景關閉（可選）
+  allowOutsideClick: true,
+  // 允許按 ESC 關閉（可選）
+  allowEscapeKey: true,
 }
 
 export function useSwal () {

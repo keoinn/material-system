@@ -24,6 +24,18 @@
 
       <v-spacer />
 
+      <!-- 表單管理按鈕（僅管理員可見） -->
+      <v-btn
+        v-if="isAdmin"
+        color="white"
+        variant="text"
+        class="mr-2"
+        to="/forms"
+      >
+        <v-icon start>mdi-form-select</v-icon>
+        表單管理
+      </v-btn>
+
       <v-menu>
         <template #activator="{ props }">
           <v-btn
@@ -66,9 +78,11 @@
   import { useRouter } from 'vue-router'
   import AppFooter from '@/components/AppFooter.vue'
   import { useAuthStore } from '@/stores/auth'
+  import { usePermissions } from '@/composables/usePermissions'
 
   const router = useRouter()
   const authStore = useAuthStore()
+  const { isAdmin } = usePermissions()
 
   /**
    * 將角色代碼轉換為中文顯示

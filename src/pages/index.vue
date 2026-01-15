@@ -10,6 +10,13 @@
           物料申請
         </v-tab>
         <v-tab
+          v-if="canApply"
+          value="apply-demo"
+        >
+          <v-icon start>mdi-file-document-edit</v-icon>
+          物料申請(舊)
+        </v-tab>
+        <v-tab
           v-if="canPackaging"
           value="packaging"
         >
@@ -67,6 +74,14 @@
           value="apply"
         >
           <MaterialApplicationForm />
+        </v-window-item>
+
+        <!-- 物料申請(舊) -->
+        <v-window-item
+          v-if="canApply"
+          value="apply-demo"
+        >
+          <MaterialApplicationFormDemo />
         </v-window-item>
 
         <!-- 包裝說明設定 -->
@@ -127,6 +142,7 @@
   import ApplicationQuery from '@/components/ApplicationQuery.vue'
   import ExcelExport from '@/components/ExcelExport.vue'
   import MaterialApplicationForm from '@/components/MaterialApplicationForm.vue'
+  import MaterialApplicationFormDemo from '@/components/MaterialApplicationFormDemo.vue'
   import PackagingTemplateSettings from '@/components/PackagingTemplateSettings.vue'
   import ReviewManagement from '@/components/ReviewManagement.vue'
   import SystemSettings from '@/components/SystemSettings.vue'
@@ -159,6 +175,7 @@
         // 檢查是否有權限訪問該 tab
         const tabPermissions = {
           apply: canApply.value,
+          'apply-demo': canApply.value,
           packaging: canPackaging.value,
           review: canReview.value,
           export: canExport.value,
@@ -174,7 +191,7 @@
     }, { immediate: true })
 
     // 如果當前 tab 沒有權限，切換到第一個有權限的 tab
-    const tabOrder = ['apply', 'packaging', 'review', 'export', 'query', 'settings', 'users']
+    const tabOrder = ['apply', 'apply-demo', 'packaging', 'review', 'export', 'query', 'settings', 'users']
     const tabPermissions = {
       apply: canApply.value,
       packaging: canPackaging.value,
