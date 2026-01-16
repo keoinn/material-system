@@ -56,6 +56,7 @@
                         <component
                           :is="getFieldComponent(field.field_type)"
                           :field="field"
+                          :form-values="formValues"
                           :loading="fieldLoading[field.field_key] || false"
                           :model-value="formValues[field.field_key]"
                           :options="getFieldOptions(field)"
@@ -101,6 +102,7 @@
                     <component
                       :is="getFieldComponent(field.field_type)"
                       :field="field"
+                      :form-values="formValues"
                       :loading="fieldLoading[field.field_key] || false"
                       :model-value="formValues[field.field_key]"
                       :options="getFieldOptions(field)"
@@ -149,6 +151,7 @@
                 <component
                   :is="getFieldComponent(field.field_type)"
                   :field="field"
+                  :form-values="formValues"
                   :loading="fieldLoading[field.field_key] || false"
                   :model-value="formValues[field.field_key]"
                   :options="getFieldOptions(field)"
@@ -207,6 +210,7 @@
   import { formDataService } from '@/api/services/formData'
   import { formFieldsService } from '@/api/services/formFields'
   import { formsService } from '@/api/services/forms'
+  import AggregatedField from './form-fields/AggregatedField.vue'
   import CascadingSelectField from './form-fields/CascadingSelectField.vue'
   import CascadingSelectLevel from './form-fields/CascadingSelectLevel.vue'
   import CheckboxField from './form-fields/CheckboxField.vue'
@@ -302,6 +306,7 @@
     datetime: DatetimeField,
     file: FileField,
     json: JsonField,
+    aggregated: AggregatedField,
   }
 
   // 按群組和子群組分類欄位（支援子群組和群組順序）
@@ -541,6 +546,15 @@
             initialValue.push(null)
           }
         }
+        // 將各層級的值也存儲到 formValues 中，使用層級的 field_key
+        if (field.field_config?.levels && Array.isArray(initialValue)) {
+          for (let index = 0; index < field.field_config.levels.length; index++) {
+            const level = field.field_config.levels[index]
+            if (level && level.field_key && initialValue[index] !== undefined) {
+              formValues[level.field_key] = initialValue[index]
+            }
+          }
+        }
       } else {
         // 對於其他類型，如果沒有值，使用預設值
         if (initialValue === undefined || initialValue === null || initialValue === '') {
@@ -730,6 +744,24 @@
     // 清除後續層級的選擇
     for (let i = levelIndex + 1; i < newValues.length; i++) {
       newValues[i] = null
+    }
+
+    // 找到對應的欄位配置
+    const field = fields.value.find(f => f.field_key === fieldKey)
+    if (field && field.field_type === 'cascading_select' && field.field_config?.levels) {
+      const level = field.field_config.levels[levelIndex]
+      if (level && level.field_key) {
+        // 將該層級的值也存儲到 formValues 中，使用層級的 field_key
+        formValues[level.field_key] = value
+
+        // 清除後續層級的值
+        for (let i = levelIndex + 1; i < field.field_config.levels.length; i++) {
+          const nextLevel = field.field_config.levels[i]
+          if (nextLevel && nextLevel.field_key) {
+            formValues[nextLevel.field_key] = null
+          }
+        }
+      }
     }
 
     handleFieldUpdate(fieldKey, newValues)

@@ -8,6 +8,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AggregatedField: typeof import('./src/components/form-fields/AggregatedField.vue')['default']
     AppFooter: typeof import('./src/components/AppFooter.vue')['default']
     ApplicationQuery: typeof import('./src/components/ApplicationQuery.vue')['default']
     CascadingSelectField: typeof import('./src/components/form-fields/CascadingSelectField.vue')['default']
