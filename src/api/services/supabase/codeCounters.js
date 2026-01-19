@@ -32,7 +32,9 @@ export default {
     let newCounter
     if (existing) {
       // 如果存在，增加計數器
-      newCounter = existing.counter + 1
+      // 如果當前值為 0，則從 1 開始（確保計數從 1 開始）
+      const currentCounter = existing.counter || 0
+      newCounter = currentCounter > 0 ? currentCounter + 1 : 1
       const { error } = await supabase
         .from('code_counters')
         .update({
@@ -68,7 +70,7 @@ export default {
   /**
    * 獲取計數器當前值（不增加）
    * @param {string} key - 計數器鍵值
-   * @returns {Promise<number>} 當前計數器值
+   * @returns {Promise<number>} 當前計數器值（如果不存在則返回 1，表示起始值）
    */
   async getCounter (key) {
     if (!isSupabaseAvailable()) {
@@ -85,7 +87,14 @@ export default {
       throw error
     }
 
-    return data?.counter || 0
+    // 如果計數器不存在，返回 1（起始值）
+    // 如果計數器存在但值為 0，也返回 1（確保從 1 開始）
+    const counterValue = data?.counter
+    if (counterValue === null || counterValue === undefined || counterValue === 0) {
+      return 1
+    }
+
+    return counterValue
   },
 
   /**

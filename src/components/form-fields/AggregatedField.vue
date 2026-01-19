@@ -21,7 +21,8 @@
 </template>
 
 <script setup>
-  import { computed, watch } from 'vue'
+  import { computed, onMounted, ref, watch } from 'vue'
+  import { codeCountersService } from '@/api/services/codeCounters'
 
   const props = defineProps({
     field: {
@@ -64,6 +65,74 @@
     return fieldConfig.value.template || ''
   })
 
+  // 計數器值（從資料庫獲取）
+  const counterValue = ref(0)
+  const counterLoading = ref(false)
+
+  // 生成計數器 key
+  function generateCounterKey () {
+    // 優先使用 field_config 中配置的 counterKey
+    if (fieldConfig.value.counterKey) {
+      return fieldConfig.value.counterKey
+    }
+
+    // 如果模板中包含 {@sn#n}，嘗試從模板中的其他欄位值構建 key
+    // 例如：如果模板是 "{#type}.{#subtype}.{#detail}.{@sn#5}"
+    // 可以構建 key 為 "{type值}{subtype值}.{detail值}"
+    const templateStr = template.value
+    if (templateStr) {
+      // 提取所有 {#field_key} 的欄位
+      const fieldKeyMatches = templateStr.matchAll(/\{#(\w+)\}/g)
+      const fieldKeys = Array.from(fieldKeyMatches, m => m[1])
+      
+      // 如果有多個欄位，嘗試構建 key
+      if (fieldKeys.length > 0) {
+        const keyParts = []
+        for (const fieldKey of fieldKeys) {
+          const value = extractValue(props.formValues[fieldKey] || '')
+          if (value) {
+            keyParts.push(value)
+          }
+        }
+        
+        // 如果所有欄位都有值，構建 key（格式：{值1}{值2}.{值3}）
+        if (keyParts.length === fieldKeys.length && keyParts.length >= 2) {
+          // 前兩個值合併，後面的值用點分隔
+          const prefix = keyParts.slice(0, 2).join('')
+          const suffix = keyParts.slice(2).join('.')
+          return suffix ? `${prefix}.${suffix}` : prefix
+        } else if (keyParts.length === 1) {
+          // 只有一個值，使用欄位 key 作為後綴
+          return `${keyParts[0]}.${props.field.field_key}`
+        }
+      }
+    }
+
+    // 預設使用欄位 key
+    return props.field.field_key || 'default'
+  }
+
+  // 載入計數器值
+  async function loadCounterValue () {
+    const counterKey = generateCounterKey()
+    if (!counterKey) {
+      counterValue.value = 1 // 預設從 1 開始
+      return
+    }
+
+    counterLoading.value = true
+    try {
+      const value = await codeCountersService.getCounter(counterKey)
+      // 確保計數器值至少為 1（起始值）
+      counterValue.value = value && value > 0 ? value : 1
+    } catch (error) {
+      console.error('載入計數器值失敗', error)
+      counterValue.value = 1 // 錯誤時也從 1 開始
+    } finally {
+      counterLoading.value = false
+    }
+  }
+
   // 計算聚合值
   const computedValue = computed(() => {
     if (!template.value) {
@@ -71,7 +140,7 @@
     }
 
     try {
-      const result = generateAggregatedValue(template.value, props.formValues || {})
+      const result = generateAggregatedValue(template.value, props.formValues || {}, counterValue.value)
       return result
     } catch (error) {
       console.error('聚合資料生成失敗', error)
@@ -121,7 +190,7 @@
   }
 
   // 生成聚合值
-  function generateAggregatedValue (templateStr, values) {
+  function generateAggregatedValue (templateStr, values, currentCounterValue) {
     if (!templateStr) {
       return ''
     }
@@ -137,9 +206,9 @@
     // 處理系統計數序號 {@sn#n}
     result = result.replace(/\{@sn#(\d+)\}/g, (match, digits) => {
       const digitCount = parseInt(digits, 10)
-      // 從 field_config 讀取計數器值，如果沒有則使用 0
-      const counterValue = fieldConfig.value.counterValue || 0
-      return String(counterValue).padStart(digitCount, '0')
+      // 使用從資料庫獲取的計數器值
+      const value = currentCounterValue || 0
+      return String(value).padStart(digitCount, '0')
     })
 
     return result
@@ -166,6 +235,20 @@
       emit('update:modelValue', newValue)
     }
   }, { immediate: true })
+
+  // 監聽 formValues 變化，重新載入計數器（當計數器 key 依賴於其他欄位值時）
+  watch(() => {
+    // 生成一個依賴於 formValues 的 key，用於觸發重新載入
+    const counterKey = generateCounterKey()
+    return counterKey
+  }, async () => {
+    await loadCounterValue()
+  }, { immediate: false })
+
+  // 組件掛載時載入計數器
+  onMounted(() => {
+    loadCounterValue()
+  })
 </script>
 
 <style scoped lang="scss">

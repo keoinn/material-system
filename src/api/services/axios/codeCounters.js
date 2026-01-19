@@ -21,11 +21,18 @@ export default {
   /**
    * 獲取計數器當前值（不增加）
    * @param {string} key - 計數器鍵值
-   * @returns {Promise<number>} 當前計數器值
+   * @returns {Promise<number>} 當前計數器值（如果不存在則返回 1，表示起始值）
    */
   async getCounter (key) {
     const response = await apiClient.get(`/code-counters/${key}`)
-    return response.data?.counter || response.counter || 0
+    const counterValue = response.data?.counter || response.counter
+    
+    // 如果計數器不存在或值為 0，返回 1（起始值）
+    if (counterValue === null || counterValue === undefined || counterValue === 0) {
+      return 1
+    }
+    
+    return counterValue
   },
 
   /**

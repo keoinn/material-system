@@ -130,14 +130,27 @@
       return []
     }
 
-    // 如果是第一層，直接返回該層的選項
+    // 如果是第一層，從 cascading_options 讀取選項
     if (levelIndex === 0) {
+      // 優先從 cascading_options 讀取
+      const cascadingOptions = fieldConfig.value.cascading_options
+      if (cascadingOptions && Array.isArray(cascadingOptions)) {
+        return formatOptions(cascadingOptions)
+      }
+      // 兼容舊格式：如果沒有 cascading_options，嘗試從 level.options 讀取
       return formatOptions(level.options || [])
     }
 
     // 如果是後續層級，需要根據前面所有層級的選擇來過濾選項
-    // 從第一層開始，逐層找到對應的選項
-    let currentOptions = levels.value[0].options || []
+    // 從 cascading_options 開始（第一層的選項）
+    let currentOptions = []
+    const cascadingOptions = fieldConfig.value.cascading_options
+    if (cascadingOptions && Array.isArray(cascadingOptions)) {
+      currentOptions = cascadingOptions
+    } else if (levels.value[0] && levels.value[0].options) {
+      // 兼容舊格式
+      currentOptions = levels.value[0].options
+    }
     
     for (let i = 0; i < levelIndex; i++) {
       const selectedValue = selectedValues.value[i]

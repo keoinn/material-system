@@ -124,7 +124,7 @@
 
         <!-- 欄位設定 -->
         <v-window-item ref="fieldsTabRef" value="fields">
-          <div class="d-flex justify-space-between align-center mb-4">
+          <div ref="fieldsHeaderRef" class="d-flex justify-space-between align-center mb-4">
             <div class="d-flex align-center" style="gap: 8px;">
               <h3 class="mb-0">表單欄位</h3>
               <v-btn
@@ -168,8 +168,85 @@
                 <v-icon start>{{ allGroupsExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
                 折疊/展開全部
               </v-btn>
+              <v-btn
+                :color="floatingWindowVisible ? 'primary' : 'default'"
+                icon
+                variant="text"
+                @click="toggleFloatingWindow"
+              >
+                <v-icon>{{ floatingWindowVisible ? 'mdi-close' : 'mdi-window-restore' }}</v-icon>
+              </v-btn>
             </div>
           </div>
+
+          <!-- 懸浮視窗：表單欄位功能按鈕 -->
+          <v-card
+            v-if="floatingWindowVisible"
+            class="fields-floating-window"
+            elevation="8"
+          >
+            <v-card-text class="pa-3">
+              <div class="d-flex align-center justify-space-between mb-3">
+                <h3 class="mb-0 text-h6">表單欄位功能</h3>
+                <v-btn
+                  icon
+                  size="small"
+                  variant="text"
+                  @click="toggleFloatingWindow"
+                >
+                  <v-icon>mdi-close</v-icon>
+                </v-btn>
+              </div>
+              <v-divider class="mb-3" />
+              <div class="d-flex align-center" style="gap: 8px; flex-wrap: wrap;">
+                <v-btn
+                  color="primary"
+                  :disabled="!canSave"
+                  :loading="saving"
+                  size="small"
+                  @click="saveForm"
+                >
+                  <v-icon start>mdi-content-save</v-icon>
+                  儲存表單
+                </v-btn>
+                <v-btn
+                  color="grey"
+                  size="small"
+                  variant="outlined"
+                  @click="handleCancel"
+                >
+                  取消
+                </v-btn>
+                <v-divider vertical />
+                <v-btn
+                  color="info"
+                  size="small"
+                  variant="outlined"
+                  @click="openGroupOrderDialog"
+                >
+                  <v-icon start>mdi-sort</v-icon>
+                  群組管理
+                </v-btn>
+                <v-btn
+                  color="primary"
+                  size="small"
+                  @click="openFieldDialog(null)"
+                >
+                  <v-icon start>mdi-plus</v-icon>
+                  新增欄位
+                </v-btn>
+                <v-btn
+                  color="secondary"
+                  size="small"
+                  variant="outlined"
+                  @click="toggleAllGroups"
+                >
+                  <v-icon start>{{ allGroupsExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                  折疊/展開全部
+                </v-btn>
+              </div>
+            </v-card-text>
+          </v-card>
 
           <!-- 按群組顯示欄位 -->
           <div>
@@ -1028,6 +1105,21 @@
                         <div class="d-flex align-center mb-3">
                           <v-icon class="mr-2" color="primary">mdi-layers</v-icon>
                           <h3 class="text-h6">層級 {{ levelIndex + 1 }} 設定</h3>
+                          <v-spacer />
+                          <v-btn
+                            :disabled="levelIndex === 0"
+                            icon="mdi-arrow-up"
+                            size="small"
+                            variant="text"
+                            @click="moveCascadingLevelUp(levelIndex)"
+                          />
+                          <v-btn
+                            :disabled="levelIndex === cascadingLevels.length - 1"
+                            icon="mdi-arrow-down"
+                            size="small"
+                            variant="text"
+                            @click="moveCascadingLevelDown(levelIndex)"
+                          />
                         </div>
 
                         <v-row>
@@ -1151,20 +1243,21 @@
                         <v-row class="mb-3">
                           <v-col cols="12" md="6">
                             <v-text-field
-                              v-model="cascadingLevels[0].label"
+                              v-model="cascadingLevels[0].placeholder"
                               density="compact"
-                              hint="此層級顯示的標籤"
-                              label="層級 1 標籤"
+                              hint="下拉選單的提示文字"
+                              label="提示文字"
                               persistent-hint
                               variant="outlined"
                             />
                           </v-col>
                           <v-col cols="12" md="6">
                             <v-text-field
-                              v-model="cascadingLevels[0].placeholder"
                               density="compact"
-                              hint="下拉選單的提示文字"
-                              label="提示文字"
+                              disabled
+                              hint="此標籤來自「多層式選單設定」中的層級 1 欄位標籤"
+                              :label="`層級 1 標籤（唯讀）`"
+                              :model-value="cascadingLevels[0]?.field_label || cascadingLevels[0]?.label || ''"
                               persistent-hint
                               variant="outlined"
                             />
@@ -1208,6 +1301,24 @@
                             </v-col>
                             <v-col class="d-flex align-center" cols="12" md="2">
                               <v-btn
+                                :disabled="optionIndex === 0"
+                                icon
+                                size="small"
+                                variant="text"
+                                @click="moveCascadingOptionUp(0, optionIndex)"
+                              >
+                                <v-icon>mdi-arrow-up</v-icon>
+                              </v-btn>
+                              <v-btn
+                                :disabled="optionIndex === (cascadingLevels[0].options || []).length - 1"
+                                icon
+                                size="small"
+                                variant="text"
+                                @click="moveCascadingOptionDown(0, optionIndex)"
+                              >
+                                <v-icon>mdi-arrow-down</v-icon>
+                              </v-btn>
+                              <v-btn
                                 color="error"
                                 icon
                                 size="small"
@@ -1230,20 +1341,21 @@
                         <v-row class="mb-3">
                           <v-col cols="12" md="6">
                             <v-text-field
-                              v-model="cascadingLevels[1].label"
+                              v-model="cascadingLevels[1].placeholder"
                               density="compact"
-                              hint="此層級顯示的標籤"
-                              label="層級 2 標籤"
+                              hint="下拉選單的提示文字"
+                              label="提示文字"
                               persistent-hint
                               variant="outlined"
                             />
                           </v-col>
                           <v-col cols="12" md="6">
                             <v-text-field
-                              v-model="cascadingLevels[1].placeholder"
                               density="compact"
-                              hint="下拉選單的提示文字"
-                              label="提示文字"
+                              disabled
+                              hint="此標籤來自「多層式選單設定」中的層級 2 欄位標籤"
+                              label="層級 2 標籤（唯讀）"
+                              :model-value="cascadingLevels[1]?.field_label || cascadingLevels[1]?.label || ''"
                               persistent-hint
                               variant="outlined"
                             />
@@ -1315,6 +1427,24 @@
                                 </v-col>
                                 <v-col class="d-flex align-center" cols="12" md="2">
                                   <v-btn
+                                    :disabled="childIndex === 0"
+                                    icon
+                                    size="small"
+                                    variant="text"
+                                    @click="moveCascadingChildOptionUp(0, level1OptionIndex, childIndex)"
+                                  >
+                                    <v-icon>mdi-arrow-up</v-icon>
+                                  </v-btn>
+                                  <v-btn
+                                    :disabled="childIndex === (level1Option.children || []).length - 1"
+                                    icon
+                                    size="small"
+                                    variant="text"
+                                    @click="moveCascadingChildOptionDown(0, level1OptionIndex, childIndex)"
+                                  >
+                                    <v-icon>mdi-arrow-down</v-icon>
+                                  </v-btn>
+                                  <v-btn
                                     color="error"
                                     icon
                                     size="small"
@@ -1340,20 +1470,21 @@
                           <v-row class="mb-3">
                             <v-col cols="12" md="6">
                               <v-text-field
-                                v-model="level.label"
+                                v-model="level.placeholder"
                                 density="compact"
-                                hint="此層級顯示的標籤"
-                                :label="`層級 ${levelIndex + 1} 標籤`"
+                                hint="下拉選單的提示文字"
+                                label="提示文字"
                                 persistent-hint
                                 variant="outlined"
                               />
                             </v-col>
                             <v-col cols="12" md="6">
                               <v-text-field
-                                v-model="level.placeholder"
                                 density="compact"
-                                hint="下拉選單的提示文字"
-                                label="提示文字"
+                                disabled
+                                hint="此標籤來自「多層式選單設定」中的層級標籤"
+                                :label="`層級 ${levelIndex + 1} 標籤（唯讀）`"
+                                :model-value="level?.field_label || level?.label || ''"
                                 persistent-hint
                                 variant="outlined"
                               />
@@ -1432,6 +1563,24 @@
                                         />
                                       </v-col>
                                       <v-col class="d-flex align-center" cols="12" md="2">
+                                        <v-btn
+                                          :disabled="childIndex === 0"
+                                          icon
+                                          size="small"
+                                          variant="text"
+                                          @click="moveCascadingChildOptionUp(levelIndex - 1, level2OptionIndex, childIndex, level1OptionIndex)"
+                                        >
+                                          <v-icon>mdi-arrow-up</v-icon>
+                                        </v-btn>
+                                        <v-btn
+                                          :disabled="childIndex === (level2Option.children || []).length - 1"
+                                          icon
+                                          size="small"
+                                          variant="text"
+                                          @click="moveCascadingChildOptionDown(levelIndex - 1, level2OptionIndex, childIndex, level1OptionIndex)"
+                                        >
+                                          <v-icon>mdi-arrow-down</v-icon>
+                                        </v-btn>
                                         <v-btn
                                           color="error"
                                           icon
@@ -1915,7 +2064,7 @@
 </template>
 
 <script setup>
-  import { computed, onMounted, reactive, ref, watch } from 'vue'
+  import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
   import { formFieldsService } from '@/api/services/formFields'
   import { formsService } from '@/api/services/forms'
   import { useSwal } from '@/composables/useSwal'
@@ -1954,6 +2103,10 @@
   const fieldsTabRef = ref(null) // 欄位設定分頁的引用
   const fieldDialog = ref(false)
   const editingFieldIndex = ref(null)
+  const floatingWindowVisible = ref(false) // 懸浮視窗顯示狀態
+  const fieldsHeaderRef = ref(null) // 原始功能列的引用
+  const isAutoShowingFloatingWindow = ref(false) // 標記是否為自動顯示（避免與手動切換衝突）
+  let scrollObserver = null // Intersection Observer 實例
   const previewValues = reactive({})
 
   const isEditMode = computed(() => !!props.formId)
@@ -2311,20 +2464,44 @@
       // 載入多層選單配置
       if (needsCascadingLevels.value && fieldData.field_config.levels) {
         cascadingLevels.value = Array.isArray(fieldData.field_config.levels)
-          ? JSON.parse(JSON.stringify(fieldData.field_config.levels)).map((level, index) => ({
-            label: level.label || `第 ${index + 1} 層`,
-            placeholder: level.placeholder || '請選擇',
-            field_key: level.field_key || '',
-            field_label: level.field_label || '',
-            is_required: level.is_required === undefined ? false : level.is_required,
-            is_visible: level.is_visible === undefined ? true : level.is_visible,
-            columnSize: level.columnSize !== undefined && level.columnSize !== null ? Number(level.columnSize) : 12,
-            display_order: level.display_order || 0,
-            placeholder_text: level.placeholder_text || '',
-            default_value: level.default_value || '',
-            help_text: level.help_text || '',
-            options: level.options || [],
-          }))
+          ? JSON.parse(JSON.stringify(fieldData.field_config.levels)).map((level, index) => {
+            // 從獨立的 cascading_options 區塊讀取選項（僅第一層）
+            let levelOptions = []
+            if (index === 0 && fieldData.field_config.cascading_options) {
+              // 第一層使用 cascading_options
+              levelOptions = Array.isArray(fieldData.field_config.cascading_options)
+                ? fieldData.field_config.cascading_options.map(opt => ({
+                  value: opt.value || '',
+                  label: opt.label || '',
+                  children: opt.children || [],
+                }))
+                : []
+            } else if (level.options) {
+              // 兼容舊格式：如果層級中還有 options（向後兼容）
+              levelOptions = Array.isArray(level.options)
+                ? level.options.map(opt => ({
+                  value: opt.value || '',
+                  label: opt.label || '',
+                  children: opt.children || [],
+                }))
+                : []
+            }
+
+            return {
+              label: level.field_label || level.label || `第 ${index + 1} 層`,
+              placeholder: level.placeholder || '請選擇',
+              field_key: level.field_key || '',
+              field_label: level.field_label || '',
+              is_required: level.is_required === undefined ? false : level.is_required,
+              is_visible: level.is_visible === undefined ? true : level.is_visible,
+              columnSize: level.columnSize !== undefined && level.columnSize !== null ? Number(level.columnSize) : 12,
+              display_order: level.display_order || 0,
+              placeholder_text: level.placeholder_text || '',
+              default_value: level.default_value || '',
+              help_text: level.help_text || '',
+              options: levelOptions,
+            }
+          })
           : []
         cascadingLevelCount.value = cascadingLevels.value.length || 1
       } else {
@@ -3083,6 +3260,96 @@
     updateJsonFromFieldData()
   }
 
+  // 上移指定層級的選項
+  function moveCascadingOptionUp (levelIndex, optionIndex) {
+    if (optionIndex === 0) return
+    if (!cascadingLevels.value[levelIndex] || !cascadingLevels.value[levelIndex].options) return
+
+    const options = cascadingLevels.value[levelIndex].options
+    const option = options[optionIndex]
+    options.splice(optionIndex, 1)
+    options.splice(optionIndex - 1, 0, option)
+    // 更新 JSON
+    updateJsonFromFieldData()
+  }
+
+  // 下移指定層級的選項
+  function moveCascadingOptionDown (levelIndex, optionIndex) {
+    if (!cascadingLevels.value[levelIndex] || !cascadingLevels.value[levelIndex].options) return
+    const options = cascadingLevels.value[levelIndex].options
+    if (optionIndex === options.length - 1) return
+
+    const option = options[optionIndex]
+    options.splice(optionIndex, 1)
+    options.splice(optionIndex + 1, 0, option)
+    // 更新 JSON
+    updateJsonFromFieldData()
+  }
+
+  // 上移指定選項的子選項
+  function moveCascadingChildOptionUp (levelIndex, optionIndex, childIndex, level1OptionIndex = null) {
+    let targetOption = null
+
+    if (level1OptionIndex !== null && level1OptionIndex >= 0) {
+      // 層級三及以後的情況
+      const level1 = cascadingLevels.value[0]
+      if (level1 && level1.options && level1.options[level1OptionIndex]) {
+        const level1Option = level1.options[level1OptionIndex]
+        if (level1Option.children && level1Option.children[optionIndex]) {
+          targetOption = level1Option.children[optionIndex]
+        }
+      }
+    } else {
+      // 層級二的情況
+      const level = cascadingLevels.value[levelIndex]
+      if (level && level.options && level.options[optionIndex]) {
+        targetOption = level.options[optionIndex]
+      }
+    }
+
+    if (targetOption && targetOption.children && childIndex > 0) {
+      const children = targetOption.children
+      const child = children[childIndex]
+      children.splice(childIndex, 1)
+      children.splice(childIndex - 1, 0, child)
+      // 更新 JSON
+      updateJsonFromFieldData()
+    }
+  }
+
+  // 下移指定選項的子選項
+  function moveCascadingChildOptionDown (levelIndex, optionIndex, childIndex, level1OptionIndex = null) {
+    let targetOption = null
+
+    if (level1OptionIndex !== null && level1OptionIndex >= 0) {
+      // 層級三及以後的情況
+      const level1 = cascadingLevels.value[0]
+      if (level1 && level1.options && level1.options[level1OptionIndex]) {
+        const level1Option = level1.options[level1OptionIndex]
+        if (level1Option.children && level1Option.children[optionIndex]) {
+          targetOption = level1Option.children[optionIndex]
+        }
+      }
+    } else {
+      // 層級二的情況
+      const level = cascadingLevels.value[levelIndex]
+      if (level && level.options && level.options[optionIndex]) {
+        targetOption = level.options[optionIndex]
+      }
+    }
+
+    if (targetOption && targetOption.children) {
+      const children = targetOption.children
+      if (childIndex < children.length - 1) {
+        const child = children[childIndex]
+        children.splice(childIndex, 1)
+        children.splice(childIndex + 1, 0, child)
+        // 更新 JSON
+        updateJsonFromFieldData()
+      }
+    }
+  }
+
   // 在指定選項下添加子選項
   // levelIndex: 父選項所在的層級索引（對於層級三，這是層級二的索引，即 1）
   // optionIndex: 父選項在該層級中的索引（對於層級三，這是層級二的選項索引）
@@ -3155,6 +3422,40 @@
     }
   }
 
+  // 移動多層選單層級向上
+  function moveCascadingLevelUp (levelIndex) {
+    if (levelIndex === 0) return
+
+    const level = cascadingLevels.value[levelIndex]
+    cascadingLevels.value.splice(levelIndex, 1)
+    cascadingLevels.value.splice(levelIndex - 1, 0, level)
+
+    // 更新所有層級的 display_order
+    for (const [index, l] of cascadingLevels.value.entries()) {
+      l.display_order = index
+    }
+
+    // 更新 JSON
+    updateJsonFromFieldData()
+  }
+
+  // 移動多層選單層級向下
+  function moveCascadingLevelDown (levelIndex) {
+    if (levelIndex === cascadingLevels.value.length - 1) return
+
+    const level = cascadingLevels.value[levelIndex]
+    cascadingLevels.value.splice(levelIndex, 1)
+    cascadingLevels.value.splice(levelIndex + 1, 0, level)
+
+    // 更新所有層級的 display_order
+    for (const [index, l] of cascadingLevels.value.entries()) {
+      l.display_order = index
+    }
+
+    // 更新 JSON
+    updateJsonFromFieldData()
+  }
+
   // 從 fieldData 生成 JSON 配置
   function updateJsonFromFieldData () {
     if (isUpdatingJsonFromData.value) {
@@ -3164,12 +3465,30 @@
     try {
       isUpdatingJsonFromData.value = true
 
-      // 建立一個臨時的 field_config 物件，包含所有當前設定
-      const tempConfig = { ...fieldData.field_config }
+      // 建立一個完整的欄位配置物件，包含所有欄位設定
+      const fullConfig = {
+        // 基本欄位屬性
+        field_key: fieldData.field_key || '',
+        field_type: fieldData.field_type || 'text',
+        field_label: fieldData.field_label || '',
+        field_label_en: fieldData.field_label_en || '',
+        display_order: fieldData.display_order === undefined ? 0 : Number(fieldData.display_order),
+        field_group: fieldData.field_group || '',
+        sub_group: fieldData.sub_group || '',
+        is_required: fieldData.is_required || false,
+        is_visible: fieldData.is_visible || false,
+        is_readonly: fieldData.is_readonly || false,
+        placeholder: fieldData.placeholder || '',
+        help_text: fieldData.help_text || '',
+        default_value: fieldData.default_value || '',
+        max_length: fieldData.max_length !== null && fieldData.max_length !== undefined ? Number(fieldData.max_length) : null,
+        // field_config 中的配置
+        field_config: { ...fieldData.field_config },
+      }
 
       // 處理選項（如果需要的話）
       if (needsOptions.value && fieldOptions.value.length > 0) {
-        tempConfig.options = fieldOptions.value
+        fullConfig.field_config.options = fieldOptions.value
           .filter(opt => opt.value && opt.label)
           .map(opt => ({
             value: opt.value,
@@ -3181,43 +3500,55 @@
       // 處理聚合資料模板
       if (needsAggregatedTemplate.value) {
         if (fieldData.field_config.template !== undefined) {
-          tempConfig.template = fieldData.field_config.template
+          fullConfig.field_config.template = fieldData.field_config.template
         }
         if (fieldData.field_config.counterValue !== undefined) {
-          tempConfig.counterValue = Number(fieldData.field_config.counterValue) || 0
+          fullConfig.field_config.counterValue = Number(fieldData.field_config.counterValue) || 0
         }
       }
 
       // 處理多層選單配置
       if (needsCascadingLevels.value && cascadingLevels.value.length > 0) {
-        tempConfig.levels = cascadingLevels.value.map(level => ({
-          label: level.label || '',
+        // 層級配置（不包含 options），按照 display_order 排序
+        const sortedLevels = [...cascadingLevels.value].toSorted((a, b) => {
+          const orderA = a.display_order === undefined ? 0 : Number(a.display_order)
+          const orderB = b.display_order === undefined ? 0 : Number(b.display_order)
+          return orderA - orderB
+        })
+
+        fullConfig.field_config.levels = sortedLevels.map(level => ({
+          label: level.field_label || level.label || '',
           placeholder: level.placeholder || '',
           field_key: level.field_key || '',
           field_label: level.field_label || '',
           is_required: level.is_required === undefined ? false : level.is_required,
           is_visible: level.is_visible === undefined ? true : level.is_visible,
           columnSize: level.columnSize !== undefined && level.columnSize !== null ? Number(level.columnSize) : 12,
-          display_order: level.display_order || 0,
+          display_order: level.display_order !== undefined ? Number(level.display_order) : 0,
           placeholder_text: level.placeholder_text || '',
           default_value: level.default_value || '',
           help_text: level.help_text || '',
-          options: (level.options || []).map(opt => ({
+        }))
+
+        // 將選項獨立為一個區塊（只包含第一層的選項，即 display_order 為 0 的層級）
+        const firstLevel = sortedLevels.find(l => (l.display_order === undefined ? 0 : Number(l.display_order)) === 0) || sortedLevels[0]
+        fullConfig.field_config.cascading_options = (firstLevel && firstLevel.options && firstLevel.options.length > 0)
+          ? firstLevel.options.map(opt => ({
             value: opt.value || '',
             label: opt.label || '',
             title: opt.label || opt.value || '',
             children: opt.children || [],
-          })),
-        }))
+          }))
+          : []
       }
 
       // 將欄位寬度保存到 field_config.cols
       if (fieldData.columnSize !== undefined && fieldData.columnSize !== null) {
-        tempConfig.cols = Number(fieldData.columnSize)
+        fullConfig.field_config.cols = Number(fieldData.columnSize)
       }
 
       // 轉換為 JSON 字串
-      fieldConfigJson.value = JSON.stringify(tempConfig, null, 2)
+      fieldConfigJson.value = JSON.stringify(fullConfig, null, 2)
     } catch (error) {
       console.error('生成 JSON 配置失敗', error)
       fieldConfigJson.value = '{}'
@@ -3236,60 +3567,139 @@
       const config = JSON.parse(fieldConfigJson.value || '{}')
       jsonError.value = false
 
-      // 合併到 fieldData.field_config
-      fieldData.field_config = { ...fieldData.field_config, ...config }
+      // 更新基本欄位屬性
+      if (config.field_key !== undefined) {
+        fieldData.field_key = config.field_key
+      }
+      if (config.field_type !== undefined) {
+        fieldData.field_type = config.field_type
+        // 觸發欄位類型變更處理
+        handleFieldTypeChange()
+      }
+      if (config.field_label !== undefined) {
+        fieldData.field_label = config.field_label
+      }
+      if (config.field_label_en !== undefined) {
+        fieldData.field_label_en = config.field_label_en
+      }
+      if (config.display_order !== undefined) {
+        fieldData.display_order = Number(config.display_order) || 0
+      }
+      if (config.field_group !== undefined) {
+        fieldData.field_group = config.field_group || ''
+        handleFieldGroupChange(config.field_group)
+      }
+      if (config.sub_group !== undefined) {
+        fieldData.sub_group = config.sub_group || ''
+        handleFieldSubGroupChange(config.sub_group)
+      }
+      if (config.is_required !== undefined) {
+        fieldData.is_required = config.is_required || false
+      }
+      if (config.is_visible !== undefined) {
+        fieldData.is_visible = config.is_visible !== false
+      }
+      if (config.is_readonly !== undefined) {
+        fieldData.is_readonly = config.is_readonly || false
+      }
+      if (config.placeholder !== undefined) {
+        fieldData.placeholder = config.placeholder || ''
+      }
+      if (config.help_text !== undefined) {
+        fieldData.help_text = config.help_text || ''
+      }
+      if (config.default_value !== undefined) {
+        fieldData.default_value = config.default_value || ''
+      }
+      if (config.max_length !== undefined && config.max_length !== null) {
+        fieldData.max_length = Number(config.max_length) || null
+      }
 
-      // 如果 JSON 中有 cols，更新 columnSize
-      if (config.cols !== undefined) {
+      // 處理 field_config
+      if (config.field_config && typeof config.field_config === 'object') {
+        // 合併到 fieldData.field_config
+        fieldData.field_config = { ...fieldData.field_config, ...config.field_config }
+
+        // 如果 JSON 中有 cols，更新 columnSize
+        if (config.field_config.cols !== undefined) {
+          fieldData.columnSize = Number(config.field_config.cols) || 12
+        }
+
+        // 如果有多層選單配置，更新 cascadingLevels
+        if (needsCascadingLevels.value && config.field_config.levels) {
+          cascadingLevels.value = Array.isArray(config.field_config.levels)
+            ? JSON.parse(JSON.stringify(config.field_config.levels)).map((level, index) => {
+              // 從獨立的 cascading_options 區塊讀取選項（僅第一層）
+              let levelOptions = []
+              if (index === 0 && config.field_config.cascading_options) {
+                // 第一層使用 cascading_options
+                levelOptions = Array.isArray(config.field_config.cascading_options)
+                  ? config.field_config.cascading_options.map(opt => ({
+                    value: opt.value || '',
+                    label: opt.label || '',
+                    children: opt.children || [],
+                  }))
+                  : []
+              } else if (level.options) {
+                // 兼容舊格式：如果層級中還有 options（向後兼容）
+                levelOptions = Array.isArray(level.options)
+                  ? level.options.map(opt => ({
+                    value: opt.value || '',
+                    label: opt.label || '',
+                    children: opt.children || [],
+                  }))
+                  : []
+              }
+
+              return {
+                label: level.field_label || level.label || `第 ${index + 1} 層`,
+                placeholder: level.placeholder || '請選擇',
+                field_key: level.field_key || '',
+                field_label: level.field_label || '',
+                is_required: level.is_required === undefined ? false : level.is_required,
+                is_visible: level.is_visible === undefined ? true : level.is_visible,
+                columnSize: level.columnSize !== undefined && level.columnSize !== null ? Number(level.columnSize) : 12,
+                display_order: level.display_order || 0,
+                placeholder_text: level.placeholder_text || '',
+                default_value: level.default_value || '',
+                help_text: level.help_text || '',
+                options: levelOptions,
+              }
+            })
+            : []
+          cascadingLevelCount.value = cascadingLevels.value.length || 1
+        }
+
+        // 如果有選項配置，更新 fieldOptions
+        if (needsOptions.value && config.field_config.options) {
+          fieldOptions.value = Array.isArray(config.field_config.options)
+            ? config.field_config.options.map(opt => {
+              if (typeof opt === 'string') {
+                return { value: opt, label: opt }
+              }
+              return { value: opt.value, label: opt.label || opt.title || opt.value }
+            })
+            : []
+        }
+
+        // 如果有聚合資料模板，更新 fieldData.field_config
+        if (needsAggregatedTemplate.value) {
+          if (config.field_config.template !== undefined) {
+            fieldData.field_config.template = config.field_config.template
+          }
+          if (config.field_config.counterValue !== undefined) {
+            fieldData.field_config.counterValue = Number(config.field_config.counterValue) || 0
+          }
+        }
+      } else if (config.cols !== undefined) {
+        // 兼容舊格式：如果 JSON 中直接有 cols（不在 field_config 中）
         fieldData.columnSize = Number(config.cols) || 12
-      }
-
-      // 如果有多層選單配置，更新 cascadingLevels
-      if (needsCascadingLevels.value && config.levels) {
-        cascadingLevels.value = Array.isArray(config.levels)
-          ? JSON.parse(JSON.stringify(config.levels)).map((level, index) => ({
-            label: level.label || `第 ${index + 1} 層`,
-            placeholder: level.placeholder || '請選擇',
-            field_key: level.field_key || '',
-            field_label: level.field_label || '',
-            is_required: level.is_required === undefined ? false : level.is_required,
-            is_visible: level.is_visible === undefined ? true : level.is_visible,
-            columnSize: level.columnSize !== undefined && level.columnSize !== null ? Number(level.columnSize) : 12,
-            display_order: level.display_order || 0,
-            placeholder_text: level.placeholder_text || '',
-            default_value: level.default_value || '',
-            help_text: level.help_text || '',
-            options: level.options || [],
-          }))
-          : []
-        cascadingLevelCount.value = cascadingLevels.value.length || 1
-      }
-
-      // 如果有選項配置，更新 fieldOptions
-      if (needsOptions.value && config.options) {
-        fieldOptions.value = Array.isArray(config.options)
-          ? config.options.map(opt => {
-            if (typeof opt === 'string') {
-              return { value: opt, label: opt }
-            }
-            return { value: opt.value, label: opt.label || opt.title || opt.value }
-          })
-          : []
-      }
-
-      // 如果有聚合資料模板，更新 fieldData.field_config
-      if (needsAggregatedTemplate.value) {
-        if (config.template !== undefined) {
-          fieldData.field_config.template = config.template
-        }
-        if (config.counterValue !== undefined) {
-          fieldData.field_config.counterValue = Number(config.counterValue) || 0
-        }
+        fieldData.field_config.cols = Number(config.cols) || 12
       }
     } catch (error) {
       console.error('解析 JSON 配置失敗', error)
       jsonError.value = true
-    // 不更新，保持原來的值
+      // 不更新，保持原來的值
     }
   }
 
@@ -3323,8 +3733,15 @@
 
     // 處理多層選單配置
     if (needsCascadingLevels.value) {
-      fieldData.field_config.levels = cascadingLevels.value.map(level => ({
-        label: level.label || '',
+      // 層級配置（不包含 options），按照 display_order 排序
+      const sortedLevels = [...cascadingLevels.value].toSorted((a, b) => {
+        const orderA = a.display_order === undefined ? 0 : Number(a.display_order)
+        const orderB = b.display_order === undefined ? 0 : Number(b.display_order)
+        return orderA - orderB
+      })
+
+      fieldData.field_config.levels = sortedLevels.map(level => ({
+        label: level.field_label || level.label || '',
         placeholder: level.placeholder || '',
         // 層級專屬設定
         field_key: level.field_key || '',
@@ -3332,17 +3749,22 @@
         is_required: level.is_required === undefined ? false : level.is_required,
         is_visible: level.is_visible === undefined ? true : level.is_visible,
         columnSize: level.columnSize !== undefined && level.columnSize !== null ? Number(level.columnSize) : 12,
-        display_order: level.display_order || 0,
+        display_order: level.display_order === undefined ? 0 : Number(level.display_order),
         placeholder_text: level.placeholder_text || '',
         default_value: level.default_value || '',
         help_text: level.help_text || '',
-        options: (level.options || []).map(opt => ({
+      }))
+
+      // 將選項獨立為一個區塊（只包含第一層的選項，即 display_order 為 0 的層級）
+      const firstLevel = sortedLevels.find(l => (l.display_order === undefined ? 0 : Number(l.display_order)) === 0) || sortedLevels[0]
+      fieldData.field_config.cascading_options = (firstLevel && firstLevel.options && firstLevel.options.length > 0)
+        ? firstLevel.options.map(opt => ({
           value: opt.value || '',
           label: opt.label || '',
           title: opt.label || opt.value || '',
           children: opt.children || [],
-        })),
-      }))
+        }))
+        : []
     }
 
     // 將欄位寬度保存到 field_config.cols
@@ -3353,15 +3775,68 @@
     // 最後從 JSON 合併（確保用戶手動編輯的 JSON 也被包含）
     try {
       const config = JSON.parse(fieldConfigJson.value || '{}')
-      // 合併配置，但保留剛剛保存的 levels 配置（如果有的話）
-      if (needsCascadingLevels.value && fieldData.field_config.levels) {
-        // 如果有多層選單配置，先保存 levels，然後合併其他配置，最後恢復 levels
-        const savedLevels = fieldData.field_config.levels
-        fieldData.field_config = { ...fieldData.field_config, ...config }
-        fieldData.field_config.levels = savedLevels // 恢復 levels 配置
-      } else {
-        fieldData.field_config = { ...fieldData.field_config, ...config }
+
+      // 更新基本欄位屬性（如果 JSON 中有）
+      if (config.field_key !== undefined) {
+        fieldData.field_key = config.field_key
       }
+      if (config.field_type !== undefined) {
+        fieldData.field_type = config.field_type
+      }
+      if (config.field_label !== undefined) {
+        fieldData.field_label = config.field_label
+      }
+      if (config.field_label_en !== undefined) {
+        fieldData.field_label_en = config.field_label_en
+      }
+      if (config.display_order !== undefined) {
+        fieldData.display_order = Number(config.display_order) || 0
+      }
+      if (config.field_group !== undefined) {
+        fieldData.field_group = config.field_group || ''
+      }
+      if (config.sub_group !== undefined) {
+        fieldData.sub_group = config.sub_group || ''
+      }
+      if (config.is_required !== undefined) {
+        fieldData.is_required = config.is_required || false
+      }
+      if (config.is_visible !== undefined) {
+        fieldData.is_visible = config.is_visible !== false
+      }
+      if (config.is_readonly !== undefined) {
+        fieldData.is_readonly = config.is_readonly || false
+      }
+      if (config.placeholder !== undefined) {
+        fieldData.placeholder = config.placeholder || ''
+      }
+      if (config.help_text !== undefined) {
+        fieldData.help_text = config.help_text || ''
+      }
+      if (config.default_value !== undefined) {
+        fieldData.default_value = config.default_value || ''
+      }
+      if (config.max_length !== undefined && config.max_length !== null) {
+        fieldData.max_length = Number(config.max_length) || null
+      }
+
+      // 處理 field_config
+      if (config.field_config && typeof config.field_config === 'object') {
+        // 合併配置，但保留剛剛保存的 levels 配置（如果有的話）
+        if (needsCascadingLevels.value && fieldData.field_config.levels) {
+          // 如果有多層選單配置，先保存 levels，然後合併其他配置，最後恢復 levels
+          const savedLevels = fieldData.field_config.levels
+          fieldData.field_config = { ...fieldData.field_config, ...config.field_config }
+          fieldData.field_config.levels = savedLevels // 恢復 levels 配置
+        } else {
+          fieldData.field_config = { ...fieldData.field_config, ...config.field_config }
+        }
+      } else if (config.cols !== undefined) {
+        // 兼容舊格式：如果 JSON 中直接有 cols（不在 field_config 中）
+        fieldData.columnSize = Number(config.cols) || 12
+        fieldData.field_config.cols = Number(config.cols) || 12
+      }
+
       // 確保 cols 不被 JSON 配置覆蓋
       if (fieldData.columnSize) {
         fieldData.field_config.cols = fieldData.columnSize
@@ -4244,7 +4719,20 @@
 
   // 監聽 fieldData 的變化，自動更新 JSON（但排除 fieldConfigJson 的變化）
   watch([
+    () => fieldData.field_key,
     () => fieldData.field_type,
+    () => fieldData.field_label,
+    () => fieldData.field_label_en,
+    () => fieldData.display_order,
+    () => fieldData.field_group,
+    () => fieldData.sub_group,
+    () => fieldData.is_required,
+    () => fieldData.is_visible,
+    () => fieldData.is_readonly,
+    () => fieldData.placeholder,
+    () => fieldData.help_text,
+    () => fieldData.default_value,
+    () => fieldData.max_length,
     () => fieldData.columnSize,
     () => fieldData.field_config,
     () => fieldOptions.value,
@@ -4274,12 +4762,82 @@
     }
   })
 
+  // 切換懸浮視窗（手動切換時清除自動顯示標記）
+  function toggleFloatingWindow () {
+    isAutoShowingFloatingWindow.value = false
+    floatingWindowVisible.value = !floatingWindowVisible.value
+  }
+
+  // 設置滾動監聽器
+  function setupScrollObserver () {
+    if (!fieldsHeaderRef.value) return
+
+    // 使用 Intersection Observer 來檢測原始功能列是否可見
+    scrollObserver = new IntersectionObserver(
+      entries => {
+        const entry = entries[0]
+        // 如果原始功能列不可見（滾出視窗），且不是手動關閉的狀態，則自動顯示懸浮視窗
+        if (!entry.isIntersecting && activeTab.value === 'fields') {
+          if (!isAutoShowingFloatingWindow.value) {
+            floatingWindowVisible.value = true
+            isAutoShowingFloatingWindow.value = true
+          }
+        } else if (entry.isIntersecting && isAutoShowingFloatingWindow.value) {
+          // 如果原始功能列重新可見，且是自動顯示的，則自動隱藏懸浮視窗
+          floatingWindowVisible.value = false
+          isAutoShowingFloatingWindow.value = false
+        }
+      },
+      {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.1, // 當 10% 的元素可見時觸發
+      },
+    )
+
+    scrollObserver.observe(fieldsHeaderRef.value)
+  }
+
+  // 清理滾動監聽器
+  function cleanupScrollObserver () {
+    if (scrollObserver) {
+      scrollObserver.disconnect()
+      scrollObserver = null
+    }
+  }
+
   onMounted(() => {
     if (isEditMode.value) {
       loadForm()
     }
     // 初始化時展開所有群組
     allGroupsExpanded.value = true
+
+    // 設置滾動監聽器
+    nextTick(() => {
+      setupScrollObserver()
+    })
+  })
+
+  onUnmounted(() => {
+    cleanupScrollObserver()
+  })
+
+  // 當切換到欄位設定分頁時，重新設置監聽器
+  watch(() => activeTab.value, newTab => {
+    if (newTab === 'fields') {
+      nextTick(() => {
+        cleanupScrollObserver()
+        setupScrollObserver()
+      })
+    } else {
+      cleanupScrollObserver()
+      // 切換到其他分頁時，如果是自動顯示的，則隱藏懸浮視窗
+      if (isAutoShowingFloatingWindow.value) {
+        floatingWindowVisible.value = false
+        isAutoShowingFloatingWindow.value = false
+      }
+    }
   })
 </script>
 
@@ -4447,5 +5005,49 @@
 
 :deep(.v-input .v-label__asterisk) {
   color: #f44336 !important;
+}
+
+// 懸浮視窗：表單欄位功能按鈕
+.fields-floating-window {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  min-width: 300px;
+  max-width: 90vw;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2) !important;
+  border-radius: 8px;
+  animation: slideInUp 0.3s ease-out;
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+// 響應式設計：小螢幕時調整位置和大小
+@media (max-width: 960px) {
+  .fields-floating-window {
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    min-width: auto;
+    max-width: none;
+  }
+
+  .fields-floating-window .v-card-text {
+    padding: 12px !important;
+  }
+
+  .fields-floating-window .v-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
 }
 </style>
