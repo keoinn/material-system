@@ -3,45 +3,40 @@
 -- ============================================================================
 -- 注意：此腳本會刪除所有資料，但保留資料表結構
 -- 執行前請確認已備份重要資料
+-- 
+-- 此腳本僅清空保留的資料表：
+-- - code_counters, export_logs, attachments, form_data_values, 
+-- - form_fields, forms, system_options, system_settings, user_profiles
 -- ============================================================================
 
--- 1. 刪除所有子表資料（有外鍵依賴的表）
--- 1.1 刪除申請相關的子表資料
-DELETE FROM application_packaging;
+-- 1. 刪除所有子表資料（按照外鍵依賴順序，先刪除子表）
+-- 1.1 刪除表單資料值（最底層，依賴 form_fields 和 forms）
+DELETE FROM form_data_values;
+
+-- 1.2 刪除附件（可能關聯到表單記錄）
 DELETE FROM attachments;
-DELETE FROM approval_logs;
+
+-- 1.3 刪除表單欄位定義（依賴 forms）
+DELETE FROM form_fields;
+
+-- 1.4 刪除表單定義
+DELETE FROM forms;
+
+-- 1.5 刪除編碼計數器（依賴 user_profiles）
 DELETE FROM code_counters;
+
+-- 1.6 刪除匯出記錄（依賴 user_profiles）
 DELETE FROM export_logs;
-DELETE FROM drafts;
-
--- 1.2 刪除申請主表資料
-DELETE FROM applications;
-
--- 1.3 刪除類別預設包裝資料
-DELETE FROM category_packaging_defaults;
-
--- 1.4 刪除包裝選項資料
-DELETE FROM packaging_options;
 
 -- 2. 刪除父表資料
--- 2.1 刪除產品分類（需要按照層級順序刪除：先刪除小類，再刪除中類，最後刪除大類）
-DELETE FROM product_categories WHERE level = 3; -- 小類
-DELETE FROM product_categories WHERE level = 2; -- 中類
-DELETE FROM product_categories WHERE level = 1; -- 大類
-
--- 2.2 刪除供應商資料
-DELETE FROM suppliers;
-
--- 2.3 刪除包裝類別資料
-DELETE FROM packaging_categories;
-
--- 2.4 刪除系統選項資料
+-- 2.1 刪除系統選項資料
 DELETE FROM system_options;
 
--- 2.5 刪除系統設定資料
+-- 2.2 刪除系統設定資料
 DELETE FROM system_settings;
 
--- 2.6 刪除使用者資料（注意：此表關聯到 auth.users，只刪除應用程式層面的資料）
+-- 2.3 刪除使用者資料（注意：此表關聯到 auth.users，只刪除應用程式層面的資料）
+-- 注意：刪除 user_profiles 前，需先刪除依賴它的表（code_counters, export_logs）
 DELETE FROM user_profiles;
 
 -- ============================================================================
@@ -50,50 +45,32 @@ DELETE FROM user_profiles;
 -- 注意：如果資料表使用 BIGSERIAL，刪除資料後序列不會自動重置
 -- 如果需要重置序列，可以執行以下語句：
 
--- ALTER SEQUENCE product_categories_id_seq RESTART WITH 1;
--- ALTER SEQUENCE suppliers_id_seq RESTART WITH 1;
--- ALTER SEQUENCE packaging_categories_id_seq RESTART WITH 1;
--- ALTER SEQUENCE packaging_options_id_seq RESTART WITH 1;
--- ALTER SEQUENCE category_packaging_defaults_id_seq RESTART WITH 1;
--- ALTER SEQUENCE system_options_id_seq RESTART WITH 1;
--- ALTER SEQUENCE applications_id_seq RESTART WITH 1;
--- ALTER SEQUENCE application_packaging_id_seq RESTART WITH 1;
--- ALTER SEQUENCE attachments_id_seq RESTART WITH 1;
--- ALTER SEQUENCE approval_logs_id_seq RESTART WITH 1;
 -- ALTER SEQUENCE code_counters_id_seq RESTART WITH 1;
 -- ALTER SEQUENCE export_logs_id_seq RESTART WITH 1;
--- ALTER SEQUENCE drafts_id_seq RESTART WITH 1;
+-- ALTER SEQUENCE attachments_id_seq RESTART WITH 1;
+-- ALTER SEQUENCE form_data_values_id_seq RESTART WITH 1;
+-- ALTER SEQUENCE form_fields_id_seq RESTART WITH 1;
+-- ALTER SEQUENCE forms_id_seq RESTART WITH 1;
+-- ALTER SEQUENCE system_options_id_seq RESTART WITH 1;
 -- ALTER SEQUENCE system_settings_id_seq RESTART WITH 1;
 
 -- ============================================================================
 -- 驗證刪除結果（可選）
 -- ============================================================================
--- SELECT 'product_categories' AS table_name, COUNT(*) AS count FROM product_categories
+-- SELECT 'code_counters' AS table_name, COUNT(*) AS count FROM code_counters
 -- UNION ALL
--- SELECT 'suppliers', COUNT(*) FROM suppliers
+-- SELECT 'export_logs', COUNT(*) FROM export_logs
 -- UNION ALL
--- SELECT 'packaging_categories', COUNT(*) FROM packaging_categories
+-- SELECT 'attachments', COUNT(*) FROM attachments
 -- UNION ALL
--- SELECT 'packaging_options', COUNT(*) FROM packaging_options
+-- SELECT 'form_data_values', COUNT(*) FROM form_data_values
 -- UNION ALL
--- SELECT 'category_packaging_defaults', COUNT(*) FROM category_packaging_defaults
+-- SELECT 'form_fields', COUNT(*) FROM form_fields
+-- UNION ALL
+-- SELECT 'forms', COUNT(*) FROM forms
 -- UNION ALL
 -- SELECT 'system_options', COUNT(*) FROM system_options
 -- UNION ALL
 -- SELECT 'system_settings', COUNT(*) FROM system_settings
 -- UNION ALL
--- SELECT 'user_profiles', COUNT(*) FROM user_profiles
--- UNION ALL
--- SELECT 'applications', COUNT(*) FROM applications
--- UNION ALL
--- SELECT 'application_packaging', COUNT(*) FROM application_packaging
--- UNION ALL
--- SELECT 'attachments', COUNT(*) FROM attachments
--- UNION ALL
--- SELECT 'approval_logs', COUNT(*) FROM approval_logs
--- UNION ALL
--- SELECT 'code_counters', COUNT(*) FROM code_counters
--- UNION ALL
--- SELECT 'export_logs', COUNT(*) FROM export_logs
--- UNION ALL
--- SELECT 'drafts', COUNT(*) FROM drafts;
+-- SELECT 'user_profiles', COUNT(*) FROM user_profiles;
