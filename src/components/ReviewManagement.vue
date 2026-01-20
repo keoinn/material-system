@@ -11,19 +11,19 @@
         :items="pendingApplications"
         :loading="loading"
       >
-        <template #item.submit_date="{ item }">
+        <template v-slot:[`item.submit_date`]="{ item }">
           {{ formatDate(item.submit_date || item.submitDate) }}
         </template>
 
-        <template #item.item_code="{ item }">
+        <template v-slot:[`item.item_code`]="{ item }">
           {{ item.item_code || item.itemCode }}
         </template>
 
-        <template #item.item_name_cn="{ item }">
+        <template v-slot:[`item.item_name_cn`]="{ item }">
           {{ item.item_name_cn || item.itemNameCN }}
         </template>
 
-        <template #item.status="{ item }">
+        <template v-slot:[`item.status`]="{ item }">
           <v-chip
             :color="getStatusColor(item.status)"
             size="small"
@@ -33,7 +33,7 @@
           </v-chip>
         </template>
 
-        <template #item.actions="{ item }">
+        <template v-slot:[`item.actions`]="{ item }">
           <v-btn
             class="mr-2"
             color="success"
@@ -110,20 +110,20 @@
                       <div class="detail-item">
                         <span class="detail-label">料號：</span>
                         <span class="detail-value font-weight-bold text-primary">
-                          {{ selectedApplication.item_code || selectedApplication.itemCode }}
+                          {{ selectedApplication.itemCode || selectedApplication.item_code || 'N/A' }}
                         </span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">中文名稱：</span>
-                        <span class="detail-value">{{ selectedApplication.item_name_cn || selectedApplication.itemNameCN }}</span>
+                        <span class="detail-value">{{ selectedApplication.itemNameCN || selectedApplication.item_name_cn || 'N/A' }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">英文名稱：</span>
-                        <span class="detail-value">{{ selectedApplication.item_name_en || selectedApplication.itemNameEN }}</span>
+                        <span class="detail-value">{{ selectedApplication.itemNameEN || selectedApplication.item_name_en || 'N/A' }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -135,7 +135,7 @@
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">表面處理：</span>
-                        <span class="detail-value">{{ selectedApplication.surface_finish || selectedApplication.surfaceFinish || 'N/A' }}</span>
+                        <span class="detail-value">{{ selectedApplication.surfaceFinish || selectedApplication.surface_finish || 'N/A' }}</span>
                       </div>
                     </v-col>
                     <v-col cols="12" md="6">
@@ -166,8 +166,32 @@
                 </v-card-text>
               </v-card>
 
-              <!-- 包裝說明區塊 -->
-              <v-card variant="outlined">
+              <!-- 動態表單資料區塊 -->
+              <v-card
+                v-if="selectedApplication.isDynamicForm && selectedFormData"
+                class="mb-4"
+                variant="outlined"
+              >
+                <v-card-title class="text-subtitle-1 bg-grey-lighten-4">
+                  <v-icon class="mr-2">mdi-form-select</v-icon>
+                  表單資料
+                </v-card-title>
+                <v-card-text>
+                  <DynamicFormRenderer
+                    :form-id="selectedFormId"
+                    :record-id="selectedApplication.id"
+                    :show-actions="false"
+                    :show-title="false"
+                    :readonly="true"
+                  />
+                </v-card-text>
+              </v-card>
+
+              <!-- 包裝說明區塊（僅非動態表單顯示） -->
+              <v-card
+                v-if="!selectedApplication.isDynamicForm && selectedApplication.packaging"
+                variant="outlined"
+              >
                 <v-card-title class="text-subtitle-1 bg-grey-lighten-4">
                   <v-icon class="mr-2">mdi-package-variant</v-icon>
                   包裝說明
@@ -253,10 +277,13 @@
 <script setup>
   import { computed, onMounted, ref } from 'vue'
   import { applicationsService } from '@/api/services/applications'
+  import { formDataService } from '@/api/services/formData'
+  import { formsService } from '@/api/services/forms'
   import { packagingService } from '@/api/services/packaging'
   import { categoriesService } from '@/api/services/categories'
   import { useSwal } from '@/composables/useSwal'
   import { useAuthStore } from '@/stores/auth'
+  import DynamicFormRenderer from './DynamicFormRenderer.vue'
 
   const swal = useSwal()
   const authStore = useAuthStore()
@@ -268,6 +295,8 @@
   const rejectReason = ref('')
   const rejectApplicationId = ref(null)
   const applications = ref([])
+  const selectedFormData = ref(null) // 動態表單資料
+  const selectedFormId = ref(null) // 動態表單 ID
 
   const pendingApplications = computed(() => applications.value)
 
@@ -281,11 +310,40 @@
     { title: '操作', key: 'actions', sortable: false },
   ]
 
-  // 載入待審核申請列表
+  // 載入待審核申請列表（從 form_data_values 讀取）
   async function loadPendingApplications () {
     loading.value = true
     try {
-      const data = await applicationsService.getApplications({ status: 'PENDING' })
+      // 嘗試獲取 material_application 表單，如果不存在則查詢所有表單的資料
+      let formData = null
+      let formId = null
+
+      try {
+        formData = await formsService.getForm('material_application', false)
+        if (formData) {
+          formId = formData.id
+        }
+      } catch (error) {
+        // 如果找不到表單，嘗試查詢所有 active 的表單
+        console.warn('找不到 material_application 表單，嘗試查詢所有表單', error)
+        try {
+          const allForms = await formsService.getForms({ is_active: true })
+          if (allForms && allForms.length > 0) {
+            // 優先使用預設表單，否則使用第一個
+            formData = allForms.find(f => f.is_default) || allForms[0]
+            if (formData) {
+              formId = formData.id
+            }
+          }
+        } catch (formsError) {
+          console.warn('無法查詢表單列表，將查詢所有 form_data_values', formsError)
+          // 如果無法查詢表單，formId 保持為 null，會查詢所有表單的資料
+        }
+      }
+
+      // 從 form_data_values 讀取待審核申請（如果 formId 為 null，會查詢所有表單的資料）
+      const data = await formDataService.getPendingFormDataList(formId, { status: 'PENDING' })
+
       // 轉換數據格式以符合組件需求
       applications.value = data.map((app) => ({
         ...app,
@@ -293,7 +351,9 @@
         itemCode: app.item_code,
         itemNameCN: app.item_name_cn,
         itemNameEN: app.item_name_en,
-        applicant: app.applicant_name || app.applicant?.username || app.applicant?.email || 'Unknown',
+        applicant: app.applicant_name || app.applicant?.username || 'Unknown',
+        isDynamicForm: true, // 所有從 form_data_values 讀取的都標記為動態表單
+        formId: app.form_id || formData?.id || null,
       }))
     } catch (error) {
       console.error('載入待審核申請失敗', error)
@@ -346,9 +406,20 @@
       loading.value = true
       try {
         const approverId = authStore.currentUser?.id
-        await applicationsService.approveApplication(id, {
+        // 從 form_data_values 更新狀態
+        const application = applications.value.find(app => app.id === id || app.record_id === id)
+        if (!application || !application.formId) {
+          throw new Error('找不到申請記錄或表單 ID')
+        }
+
+        // 更新 form_data_values 中的 status 和 approval_status
+        await formDataService.updateFormData(application.formId, id, {
+          status: 'APPROVED',
+          approval_status: 'APPROVED',
           approver_id: approverId,
+          approval_date: new Date().toISOString(),
         })
+
         await swal.success('申請已核准！')
         // 重新載入列表
         await loadPendingApplications()
@@ -376,10 +447,21 @@
     loading.value = true
     try {
       const approverId = authStore.currentUser?.id
-      await applicationsService.rejectApplication(rejectApplicationId.value, {
+      // 從 form_data_values 更新狀態
+      const application = applications.value.find(app => app.id === rejectApplicationId.value || app.record_id === rejectApplicationId.value)
+      if (!application || !application.formId) {
+        throw new Error('找不到申請記錄或表單 ID')
+      }
+
+      // 更新 form_data_values 中的 status 和 approval_status
+      await formDataService.updateFormData(application.formId, rejectApplicationId.value, {
+        status: 'REJECTED',
+        approval_status: 'REJECTED',
         reject_reason: rejectReason.value,
         approver_id: approverId,
+        reject_date: new Date().toISOString(),
       })
+
       rejectDialog.value = false
       rejectReason.value = ''
       await swal.success('申請已退回！')
@@ -396,50 +478,96 @@
   async function viewDetails (id) {
     loading.value = true
     try {
-      // 載入申請詳情
-      const application = await applicationsService.getApplication(id)
-      
-      // 載入包裝數據
-      const packagingData = await packagingService.getApplicationPackaging(id)
-      
-      // 轉換包裝數據格式
-      const packaging = {}
-      for (const item of packagingData) {
-        const categoryCode = item.packaging_categories?.code
-        if (!categoryCode) continue
-
-        if (!packaging[categoryCode]) {
-          packaging[categoryCode] = {
-            options: [],
-            description: '',
-          }
-        }
-
-        const optionName = item.packaging_options?.name || item.packaging_options?.code
-        if (optionName) {
-          packaging[categoryCode].options.push(optionName)
-        }
-
-        if (item.description) {
-          packaging[categoryCode].description = item.description
-        }
+      // 從列表中查找申請資訊
+      const application = applications.value.find(app => app.id === id || app.record_id === id)
+      if (!application || !application.formId) {
+        throw new Error('找不到申請記錄')
       }
 
-      // 載入申請人資訊
-      const applicantName = application.applicant_name || 
-                           application.applicant?.username || 
-                           application.applicant?.email || 
-                           'Unknown'
+      // 載入動態表單資料
+      try {
+        const formData = await formDataService.getFormData(application.formId, id, {
+          includeFieldDefinitions: true,
+        })
+        selectedFormData.value = formData
+        selectedFormId.value = application.formId
+      } catch (error) {
+        console.error('載入動態表單資料失敗', error)
+        selectedFormData.value = null
+        selectedFormId.value = null
+      }
 
+      // 從表單資料中讀取對應欄位值
+      const formValues = selectedFormData.value?.values || {}
+      const formFields = selectedFormData.value?.fields || []
+
+      // 查找對應的欄位 field_key
+      const findFieldKeyByLabel = (label) => {
+        const field = formFields.find(f => 
+          f.field_label === label || 
+          f.field_label_en === label ||
+          f.field_label?.includes(label) ||
+          f.field_label_en?.includes(label)
+        )
+        return field?.field_key
+      }
+
+      // 對應關係：
+      // 料號 → 系統編碼 (item_code)
+      // 中文名稱 → 料件說明 (中文)
+      // 英文名稱 → 料件說明 (英文)
+      // 材質 → 基本材質
+      // 表面處理 → 基本材質 表面處理
+
+      const itemCodeKey = findFieldKeyByLabel('系統編碼') || 'item_code'
+      const itemNameCNKey = findFieldKeyByLabel('料件說明') || findFieldKeyByLabel('料件說明 (中文)') || 'item_name_cn'
+      const itemNameENKey = findFieldKeyByLabel('料件說明 (英文)') || 'item_name_en'
+      const materialKey = findFieldKeyByLabel('基本材質') || 'material'
+      const surfaceFinishKey = findFieldKeyByLabel('表面處理') || findFieldKeyByLabel('基本材質 表面處理') || 'surface_finish'
+
+      // 查找欄位定義並獲取選項的 label
+      const getFieldLabelByValue = (fieldKey, value) => {
+        if (!value) {
+          return null
+        }
+        const field = formFields.find(f => f.field_key === fieldKey)
+        if (!field || !field.field_config?.options) {
+          return value
+        }
+        const options = field.field_config.options
+        const option = options.find(opt => {
+          if (typeof opt === 'string') {
+            return opt === value
+          }
+          return (opt.value || opt) === value
+        })
+        if (option) {
+          if (typeof option === 'string') {
+            return option
+          }
+          return option.title || option.label || option.value || value
+        }
+        return value
+      }
+
+      // 獲取材質欄位的值
+      const materialValue = formValues[materialKey] || application.material
+      // 獲取材質欄位的 label
+      const materialLabel = getFieldLabelByValue(materialKey, materialValue)
+
+      // 使用從 form_data_values 讀取的資料
       selectedApplication.value = {
         ...application,
         submitDate: application.submit_date,
-        itemCode: application.item_code,
-        itemNameCN: application.item_name_cn,
-        itemNameEN: application.item_name_en,
-        surfaceFinish: application.surface_finish,
-        applicant: applicantName,
-        packaging,
+        itemCode: formValues[itemCodeKey] || application.item_code,
+        itemNameCN: formValues[itemNameCNKey] || application.item_name_cn,
+        itemNameEN: formValues[itemNameENKey] || application.item_name_en,
+        material: materialLabel || materialValue || 'N/A',
+        surfaceFinish: formValues[surfaceFinishKey] || application.surface_finish,
+        applicant: application.applicant_name || 
+                  application.applicant?.username || 
+                  'Unknown',
+        isDynamicForm: true,
       }
 
       detailDialog.value = true

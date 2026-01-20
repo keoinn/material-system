@@ -86,6 +86,21 @@ export const formDataService = {
   },
 
   /**
+   * 取得待審核的表單資料列表（從 form_data_values 讀取）
+   * @param {number|string} formId - 表單 ID 或 form_code
+   * @param {object} filters - 篩選條件（status 等）
+   * @returns {Promise<Array>} 返回格式化的申請列表
+   */
+  async getPendingFormDataList (formId, filters = {}) {
+    const impl = getImplementation()
+    if (impl.getPendingFormDataList) {
+      return impl.getPendingFormDataList(formId, filters)
+    }
+    // 如果實作沒有此方法，使用 getFormDataList 作為後備
+    return this.getFormDataList(formId, filters)
+  },
+
+  /**
    * 取得欄位值（單一欄位）
    * @param {number|string} formId - 表單 ID 或 form_code
    * @param {number|string} recordId - 記錄 ID

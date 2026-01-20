@@ -61,11 +61,12 @@ export default {
       .from('forms')
       .select(includeFields ? '*, form_fields(*)' : '*')
       .eq(queryField, idOrCode)
-      .single()
+      .maybeSingle()
 
     const { data, error } = await query
 
-    if (error) {
+    // 如果查詢出錯（非 PGRST116），拋出錯誤
+    if (error && error.code !== 'PGRST116') {
       throw error
     }
 

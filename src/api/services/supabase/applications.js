@@ -32,6 +32,16 @@ export default {
       }
     }
 
+    // 獲取表單 ID（用於查詢動態表單資料）
+    const { data: formData } = await supabase
+      .from('forms')
+      .select('id, form_code')
+      .eq('form_code', 'material_application')
+      .single()
+
+    const formId = formData?.id || null
+
+    // 查詢 applications 表中的申請
     let query = supabase
       .from('applications')
       .select(`
@@ -82,16 +92,135 @@ export default {
     // 排序
     query = query.order('submit_date', { ascending: false })
 
-    const { data, error } = await query
+    const { data: applicationsData, error } = await query
 
     if (error) {
       throw error
     }
 
-    // 處理申請人資訊
-    return (data || []).map(app => ({
+    // 查詢動態表單申請（form_data_values 中有資料但 applications 表中可能沒有記錄的）
+    let dynamicFormApplications = []
+    if (formId) {
+      // 查詢所有待審核的動態表單資料
+      const { data: formValuesData } = await supabase
+        .from('form_data_values')
+        .select('record_id, created_by_id, created_at')
+        .eq('form_id', formId)
+        .order('created_at', { ascending: false })
+
+      if (formValuesData && formValuesData.length > 0) {
+        // 獲取所有唯一的 record_id
+        const recordIds = [...new Set(formValuesData.map(fv => fv.record_id))]
+
+        // 檢查哪些 record_id 在 applications 表中不存在
+        const existingRecordIds = new Set((applicationsData || []).map(app => app.id))
+        const missingRecordIds = recordIds.filter(rid => !existingRecordIds.has(rid))
+
+        // 對於缺失的記錄，嘗試從 form_data_values 提取資料創建臨時申請記錄
+        for (const recordId of missingRecordIds) {
+          // 檢查是否為臨時 ID（時間戳格式）
+          const isTempId = typeof recordId === 'number' && recordId > 1000000000000
+
+          if (isTempId) {
+            // 這是臨時 ID，需要創建 applications 記錄
+            // 提取關鍵欄位值
+            const { data: itemCodeData } = await supabase
+              .from('form_data_values')
+              .select('field_value')
+              .eq('form_id', formId)
+              .eq('record_id', recordId)
+              .eq('field_key', 'item_code')
+              .single()
+
+            const { data: itemNameCNData } = await supabase
+              .from('form_data_values')
+              .select('field_value')
+              .eq('form_id', formId)
+              .eq('record_id', recordId)
+              .eq('field_key', 'item_name_cn')
+              .single()
+
+            const { data: itemNameENData } = await supabase
+              .from('form_data_values')
+              .select('field_value')
+              .eq('form_id', formId)
+              .eq('record_id', recordId)
+              .eq('field_key', 'item_name_en')
+              .single()
+
+            const itemCode = itemCodeData?.field_value || `TEMP-${recordId}`
+            const itemNameCN = itemNameCNData?.field_value || '未命名物料'
+            const itemNameEN = itemNameENData?.field_value || 'Unnamed Material'
+
+            // 獲取申請人 ID
+            const formValueRecord = formValuesData.find(fv => fv.record_id === recordId)
+            const applicantId = formValueRecord?.created_by_id
+
+            // 創建 applications 記錄
+            const { data: newApplication, error: createError } = await supabase
+              .from('applications')
+              .insert({
+                item_code: itemCode,
+                item_name_cn: itemNameCN,
+                item_name_en: itemNameEN,
+                applicant_id: applicantId,
+                status: 'PENDING',
+                approval_status: 'PENDING',
+                submit_date: formValueRecord?.created_at || new Date().toISOString(),
+              })
+              .select(`
+                *,
+                applicant:user_profiles!applications_applicant_id_fkey (
+                  id,
+                  username
+                )
+              `)
+              .single()
+
+            if (!createError && newApplication) {
+              // 更新 form_data_values 中的 record_id
+              await supabase
+                .from('form_data_values')
+                .update({ record_id: newApplication.id })
+                .eq('form_id', formId)
+                .eq('record_id', recordId)
+
+              // 添加到結果中
+              dynamicFormApplications.push(newApplication)
+            }
+          }
+        }
+      }
+
+      // 批量查詢動態表單標記（一次性查詢所有申請的 form_data_values）
+      const allApplicationIds = [
+        ...(applicationsData || []).map(app => app.id),
+        ...dynamicFormApplications.map(app => app.id),
+      ]
+
+      let dynamicFormRecordIds = new Set()
+      if (allApplicationIds.length > 0) {
+        const { data: formValues } = await supabase
+          .from('form_data_values')
+          .select('record_id')
+          .eq('form_id', formId)
+          .in('record_id', allApplicationIds)
+
+        if (formValues) {
+          dynamicFormRecordIds = new Set(formValues.map(fv => fv.record_id))
+        }
+      }
+    }
+
+    // 合併 applications 表中的申請和動態表單申請
+    const allApplications = [...(applicationsData || []), ...dynamicFormApplications]
+
+    // 處理申請人資訊和動態表單標記
+    return allApplications.map(app => ({
       ...app,
       applicant_name: app.applicant?.username || 'Unknown',
+      is_dynamic_form: formId ? (dynamicFormRecordIds?.has(app.id) || false) : false,
+      form_id: formId,
     }))
   },
 
@@ -103,7 +232,8 @@ export default {
       throw new Error('Supabase 客戶端未初始化')
     }
 
-    const { data, error } = await supabase
+    // 先從 applications 表查詢
+    const { data: appData, error: appError } = await supabase
       .from('applications')
       .select(`
         *,
@@ -115,13 +245,38 @@ export default {
       .eq('id', id)
       .single()
 
-    if (error) {
-      throw error
+    if (appError) {
+      throw appError
+    }
+
+    // 檢查是否為動態表單申請
+    const { data: formData } = await supabase
+      .from('forms')
+      .select('id, form_code')
+      .eq('form_code', 'material_application')
+      .single()
+
+    let isDynamicForm = false
+    let formId = null
+
+    if (formData) {
+      formId = formData.id
+      // 檢查是否有對應的 form_data_values
+      const { data: formValues } = await supabase
+        .from('form_data_values')
+        .select('id')
+        .eq('form_id', formId)
+        .eq('record_id', id)
+        .limit(1)
+
+      isDynamicForm = formValues && formValues.length > 0
     }
 
     return {
-      ...data,
-      applicant_name: data.applicant?.username || 'Unknown',
+      ...appData,
+      applicant_name: appData.applicant?.username || 'Unknown',
+      is_dynamic_form: isDynamicForm,
+      form_id: formId,
     }
   },
 

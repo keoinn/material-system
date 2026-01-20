@@ -1100,6 +1100,20 @@
                         </div>
                       </v-alert>
 
+                      <!-- 主欄位鍵值設定 -->
+                      <v-row class="mb-4">
+                        <v-col cols="12" md="6">
+                          <v-text-field
+                            v-model="fieldData.field_key"
+                            hint="多層式選單的主欄位鍵值，用於資料庫儲存和程式碼識別"
+                            label="欄位鍵值 *"
+                            :rules="[rules.required, rules.fieldKey]"
+                            persistent-hint
+                            variant="outlined"
+                          />
+                        </v-col>
+                      </v-row>
+
                       <!-- 根據層次數量動態生成設定 -->
                       <div v-for="(level, levelIndex) in cascadingLevels" :key="levelIndex" class="mb-6 border pa-4 rounded">
                         <div class="d-flex align-center mb-3">
@@ -4437,6 +4451,9 @@
             field.id = createdField.id
           }
 
+          // 注意：cascading_select 的層級不再創建獨立的 form_fields 記錄
+          // 層級的 field_key 只用於保存資料時識別，不會在 form_fields 中創建對應記錄
+
           saveProgress.value = 30 + (i + 1) * fieldProgressStep
         }
       } else {
@@ -4493,6 +4510,10 @@
           })
           // 更新本地欄位的 id
           field.id = createdField.id
+
+          // 注意：cascading_select 的層級不再創建獨立的 form_fields 記錄
+          // 層級的 field_key 只用於保存資料時識別，不會在 form_fields 中創建對應記錄
+
           saveProgress.value = 20 + (i + 1) * fieldProgressStep
         }
       }

@@ -113,21 +113,25 @@
   }
 
   // 載入計數器值
+  // 注意：counter 表存儲的是"下一個要使用的計數值"
+  // - 如果不存在，使用 1（表示下一個要使用的序號是 1，即當前要使用的序號）
+  // - 如果存在，使用 counter 值（表示下一個要使用的序號，即當前要使用的序號）
   async function loadCounterValue () {
     const counterKey = generateCounterKey()
     if (!counterKey) {
-      counterValue.value = 1 // 預設從 1 開始
+      counterValue.value = 1 // 預設從 1 開始（表示下一個要使用的序號是 1）
       return
     }
 
     counterLoading.value = true
     try {
       const value = await codeCountersService.getCounter(counterKey)
-      // 確保計數器值至少為 1（起始值）
-      counterValue.value = value && value > 0 ? value : 1
+      // counter 表存儲的是"下一個要使用的計數值"，直接使用即可
+      // 如果查詢不到或值無效，使用 1（表示下一個要使用的序號是 1）
+      counterValue.value = value && value >= 1 ? value : 1
     } catch (error) {
       console.error('載入計數器值失敗', error)
-      counterValue.value = 1 // 錯誤時也從 1 開始
+      counterValue.value = 1 // 錯誤時也從 1 開始（表示下一個要使用的序號是 1）
     } finally {
       counterLoading.value = false
     }
@@ -204,10 +208,12 @@
     })
 
     // 處理系統計數序號 {@sn#n}
+    // currentCounterValue 是"下一個要使用的計數值"（從 getCounter 返回），直接使用即可
+    // 如果值無效，使用 1（表示下一個要使用的序號是 1，即當前要使用的序號）
     result = result.replace(/\{@sn#(\d+)\}/g, (match, digits) => {
       const digitCount = parseInt(digits, 10)
-      // 使用從資料庫獲取的計數器值
-      const value = currentCounterValue || 0
+      // 使用從資料庫獲取的計數器值（表示下一個要使用的序號，即當前要使用的序號）
+      const value = currentCounterValue && currentCounterValue >= 1 ? currentCounterValue : 1
       return String(value).padStart(digitCount, '0')
     })
 

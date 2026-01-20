@@ -37,7 +37,7 @@
                             :md="getLevelMd(level)"
                           >
                             <CascadingSelectLevel
-                              :field="field"
+                              :field="getFieldWithReadonly(field)"
                               :level="level"
                               :level-index="levelIndex"
                               :loading="fieldLoading[field.field_key] || false"
@@ -55,7 +55,7 @@
                       >
                         <component
                           :is="getFieldComponent(field.field_type)"
-                          :field="field"
+                          :field="getFieldWithReadonly(field)"
                           :form-values="formValues"
                           :loading="fieldLoading[field.field_key] || false"
                           :model-value="formValues[field.field_key]"
@@ -83,7 +83,7 @@
                         :md="getLevelMd(level)"
                       >
                         <CascadingSelectLevel
-                          :field="field"
+                          :field="getFieldWithReadonly(field)"
                           :level="level"
                           :level-index="levelIndex"
                           :loading="fieldLoading[field.field_key] || false"
@@ -101,7 +101,7 @@
                   >
                     <component
                       :is="getFieldComponent(field.field_type)"
-                      :field="field"
+                      :field="getFieldWithReadonly(field)"
                       :form-values="formValues"
                       :loading="fieldLoading[field.field_key] || false"
                       :model-value="formValues[field.field_key]"
@@ -276,6 +276,11 @@
       type: Boolean,
       default: true,
     },
+    // 是否唯讀模式
+    readonly: {
+      type: Boolean,
+      default: false,
+    },
   })
 
   const emit = defineEmits(['submit', 'cancel', 'update:modelValue', 'field-update'])
@@ -385,7 +390,7 @@
   // 取得指定群組的子群組列表（按順序）
   function getSubGroupsForGroup (groupName) {
     const subGroupsList = subGroups.value.get(groupName) || []
-    return subGroupsList.sort((a, b) => (a.order || 0) - (b.order || 0))
+    return subGroupsList.toSorted((a, b) => (a.order || 0) - (b.order || 0))
   }
 
   // 取得用於顯示的子群組結構（包含子群組和未分組欄位）
@@ -415,7 +420,7 @@
     if (groupData.subGroups) {
       for (const subGroupName of Object.keys(groupData.subGroups)) {
         // 如果子群組不在已處理的列表中，且有欄位，則添加
-        if ((!subGroupsList || !subGroupsList.find(sg => sg.name === subGroupName)) && groupData.subGroups[subGroupName] && groupData.subGroups[subGroupName].length > 0) {
+        if ((!subGroupsList || !subGroupsList.some(sg => sg.name === subGroupName)) && groupData.subGroups[subGroupName] && groupData.subGroups[subGroupName].length > 0) {
           result[subGroupName] = groupData.subGroups[subGroupName]
         }
       }
@@ -448,7 +453,7 @@
               allGroups.add(field.field_group)
             }
           }
-          groupOrder.value = Array.from(allGroups).sort()
+          groupOrder.value = Array.from(allGroups).toSorted()
         }
 
         // 載入子群組資料（從 form_config 中）
@@ -501,7 +506,29 @@
     try {
       const data = await formDataService.getFormData(props.formId, props.recordId)
       if (data && data.values) {
+        // 先將所有值賦值給 formValues
         Object.assign(formValues, data.values)
+
+        // 對於 cascading select 欄位，需要將各個層級的值組合成陣列
+        for (const field of fields.value) {
+          if (field.field_type === 'cascading_select' && field.field_config?.levels) {
+            const levels = field.field_config.levels
+            const cascadingValues = []
+
+            // 從 formValues 中讀取各個層級的值（使用層級的 field_key）
+            for (const level of levels) {
+              if (level && level.field_key) {
+                const levelValue = formValues[level.field_key]
+                cascadingValues.push(levelValue === undefined ? null : levelValue)
+              } else {
+                cascadingValues.push(null)
+              }
+            }
+
+            // 將組合後的陣列存儲到主欄位的 field_key
+            formValues[field.field_key] = cascadingValues
+          }
+        }
       }
     } catch (error) {
       console.error('載入表單資料失敗', error)
@@ -595,6 +622,17 @@
     return fieldComponents[fieldType] || TextField
   }
 
+  // 取得帶有唯讀狀態的欄位（如果 props.readonly 為 true，則將欄位設為唯讀）
+  function getFieldWithReadonly (field) {
+    if (props.readonly) {
+      return {
+        ...field,
+        is_readonly: true,
+      }
+    }
+    return field
+  }
+
   // 取得欄位選項
   function getFieldOptions (field) {
     const config = field.field_config || {}
@@ -641,7 +679,7 @@
   }
 
   // 載入欄位選項
-  async function loadFieldOptions (field, config) {
+  async function loadFieldOptions (_field, _config) {
     // 這裡可以根據 config.source 載入不同的資料
     // 例如：system_options, product_categories, suppliers 等
     // 目前先返回空陣列，實際實作時需要根據 source 類型載入
@@ -893,7 +931,7 @@
 }
 
 .subgroup-content {
-  // 不需要額外的 padding，因為 container 已經有 padding
+  /* 不需要額外的 padding，因為 container 已經有 padding */
 }
 
 // 必填欄位的紅色星號
