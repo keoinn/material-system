@@ -7,6 +7,15 @@
       elevation="2"
       prominent
     >
+      <!-- 選單按鈕 -->
+      <v-btn
+        class="mr-2"
+        icon
+        @click="drawer = !drawer"
+      >
+        <v-icon>mdi-menu</v-icon>
+      </v-btn>
+
       <v-app-bar-title>
         <div class="d-flex align-center">
           <v-icon class="mr-2">mdi-package-variant</v-icon>
@@ -23,18 +32,6 @@
       </v-app-bar-title>
 
       <v-spacer />
-
-      <!-- 表單管理按鈕（僅管理員可見） -->
-      <v-btn
-        v-if="isAdmin"
-        color="white"
-        variant="text"
-        class="mr-2"
-        to="/forms"
-      >
-        <v-icon start>mdi-form-select</v-icon>
-        表單管理
-      </v-btn>
 
       <v-menu>
         <template #activator="{ props }">
@@ -65,6 +62,123 @@
       </v-menu>
     </v-app-bar>
 
+    <!-- 側邊欄導航抽屜 -->
+    <v-navigation-drawer
+      v-if="authStore.isLoggedIn && authStore.currentUser && authStore.currentUser.username !== 'Guest'"
+      v-model="drawer"
+      temporary
+    >
+      <v-list>
+        <v-list-item>
+          <v-list-item-title class="text-h6">
+            功能選單
+          </v-list-item-title>
+        </v-list-item>
+        <v-divider />
+
+        <v-list-item
+          v-if="canApply"
+          @click="navigateToTab('apply')"
+        >
+          <template #prepend>
+            <v-icon>mdi-file-document-plus</v-icon>
+          </template>
+          <v-list-item-title>物料申請</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          v-if="canPackaging"
+          @click="navigateToTab('packaging')"
+        >
+          <template #prepend>
+            <v-icon>mdi-package-variant</v-icon>
+          </template>
+          <v-list-item-title>包裝說明設定</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          v-if="canReview"
+          @click="navigateToTab('review')"
+        >
+          <template #prepend>
+            <v-icon>mdi-check-circle</v-icon>
+          </template>
+          <v-list-item-title>
+            <div class="d-flex align-center">
+              <span>審核管理</span>
+              <v-badge
+                v-if="pendingCount > 0"
+                class="ml-2"
+                color="error"
+                :content="pendingCount"
+                inline
+              />
+            </div>
+          </v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          v-if="canExport"
+          @click="navigateToTab('export')"
+        >
+          <template #prepend>
+            <v-icon>mdi-file-excel</v-icon>
+          </template>
+          <v-list-item-title>EXCEL匯出</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          v-if="canQuery"
+          @click="navigateToTab('query')"
+        >
+          <template #prepend>
+            <v-icon>mdi-magnify</v-icon>
+          </template>
+          <v-list-item-title>申請查詢</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          v-if="canSettings"
+          @click="navigateToTab('settings')"
+        >
+          <template #prepend>
+            <v-icon>mdi-cog</v-icon>
+          </template>
+          <v-list-item-title>系統設定</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          v-if="canUsers"
+          @click="navigateToTab('users')"
+        >
+          <template #prepend>
+            <v-icon>mdi-account-group</v-icon>
+          </template>
+          <v-list-item-title>使用者管理</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          v-if="canApprovalWorkflow"
+          @click="navigateToTab('approval-workflow')"
+        >
+          <template #prepend>
+            <v-icon>mdi-sitemap</v-icon>
+          </template>
+          <v-list-item-title>審核流程設定</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item
+          v-if="canForms"
+          @click="navigateToTab('forms')"
+        >
+          <template #prepend>
+            <v-icon>mdi-form-select</v-icon>
+          </template>
+          <v-list-item-title>表單管理</v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-navigation-drawer>
+
     <v-main>
       <router-view />
     </v-main>
@@ -75,14 +189,30 @@
 </template>
 
 <script setup>
+  import { computed, ref } from 'vue'
   import { useRouter } from 'vue-router'
   import AppFooter from '@/components/AppFooter.vue'
-  import { useAuthStore } from '@/stores/auth'
   import { usePermissions } from '@/composables/usePermissions'
+  import { useApplicationsStore } from '@/stores/applications'
+  import { useAuthStore } from '@/stores/auth'
 
   const router = useRouter()
   const authStore = useAuthStore()
-  const { isAdmin } = usePermissions()
+  const applicationsStore = useApplicationsStore()
+  const {
+    canApply,
+    canPackaging,
+    canReview,
+    canExport,
+    canQuery,
+    canSettings,
+    canUsers,
+    canApprovalWorkflow,
+    canForms,
+  } = usePermissions()
+
+  const drawer = ref(false)
+  const pendingCount = computed(() => applicationsStore.pendingCount)
 
   /**
    * 將角色代碼轉換為中文顯示
@@ -99,6 +229,13 @@
   function handleLogout () {
     authStore.logout()
     router.push('/login')
+  }
+
+  /**
+   * 導航到指定的 tab
+   */
+  function navigateToTab (tab) {
+    router.push({ path: '/', query: { tab } })
   }
 </script>
 

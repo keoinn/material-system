@@ -3,7 +3,6 @@
     <v-card-title class="system-header">
       <h2>申請記錄查詢</h2>
     </v-card-title>
-
     <v-card-text class="pt-6">
       <v-form ref="formRef">
         <v-row>
@@ -41,7 +40,6 @@
             />
           </v-col>
         </v-row>
-
         <div class="d-flex justify-center gap-4 mt-4">
           <v-btn
             color="primary"
@@ -61,8 +59,6 @@
           </v-btn>
         </div>
       </v-form>
-
-      <!-- 查詢結果 -->
       <v-card v-if="queryResults.length > 0 || loading" class="mt-4">
         <v-card-title>查詢結果（共 {{ queryResults.length }} 筆）</v-card-title>
         <v-card-text>
@@ -79,21 +75,19 @@
             :items="queryResults"
             :items-per-page="10"
           >
-            <template #item.submit_date="{ item }">
+            <template v-slot:[`item.submit_date`]="{ item }">
               {{ formatDate(item.submit_date) }}
             </template>
-
-            <template #item.status="{ item }">
+            <template v-slot:[`item.status`]="{ item }">
               <v-chip
-                :color="getStatusColor(item.status)"
+                :color="getStatusColor(item.current_status_code || item.status)"
                 size="small"
                 variant="flat"
               >
-                {{ getStatusText(item.status) }}
+                {{ item.current_status_name || getStatusText(item.current_status_code || item.status) }}
               </v-chip>
             </template>
-
-            <template #item.actions="{ item }">
+            <template v-slot:[`item.actions`]="{ item }">
               <v-btn
                 color="info"
                 size="small"
@@ -106,13 +100,11 @@
           </v-data-table>
         </v-card-text>
       </v-card>
-
-      <!-- 申請詳情對話框 -->
       <v-dialog
         v-model="detailDialog"
         max-width="900"
-        scrollable
         persistent
+        scrollable
       >
         <v-card v-if="selectedApplication">
           <v-card-title class="d-flex align-center bg-primary text-white">
@@ -127,10 +119,8 @@
               <v-icon>mdi-close</v-icon>
             </v-btn>
           </v-card-title>
-
           <v-card-text class="pa-0">
             <v-container>
-              <!-- 基本資訊區塊 -->
               <v-card
                 class="mb-4"
                 variant="outlined"
@@ -195,66 +185,59 @@
                       <div class="detail-item">
                         <span class="detail-label">狀態：</span>
                         <v-chip
-                          :color="getStatusColor(selectedApplication.status)"
+                          :color="getStatusColor(selectedApplication.current_status_code || selectedApplication.status)"
                           size="small"
                           variant="flat"
                         >
-                          {{ getStatusText(selectedApplication.status) }}
+                          {{ selectedApplication.current_status_name || getStatusText(selectedApplication.current_status_code || selectedApplication.status) }}
                         </v-chip>
+                      </div>
+                    </v-col>
+                    <v-col
+                      v-if="selectedApplication.current_step_name"
+                      cols="12"
+                      md="6"
+                    >
+                      <div class="detail-item">
+                        <span class="detail-label">當前步驟：</span>
+                        <span class="detail-value">{{ selectedApplication.current_step_name }}</span>
+                      </div>
+                    </v-col>
+                    <v-col
+                      v-if="selectedApplication.workflow_name"
+                      cols="12"
+                      md="6"
+                    >
+                      <div class="detail-item">
+                        <span class="detail-label">審核流程：</span>
+                        <span class="detail-value">{{ selectedApplication.workflow_name }}</span>
                       </div>
                     </v-col>
                   </v-row>
                 </v-card-text>
               </v-card>
-
-              <!-- 包裝說明區塊 -->
-              <v-card variant="outlined">
+              <v-card
+                v-if="selectedApplication.is_dynamic_form && selectedFormData"
+                class="mb-4"
+                variant="outlined"
+              >
                 <v-card-title class="text-subtitle-1 bg-grey-lighten-4">
-                  <v-icon class="mr-2">mdi-package-variant</v-icon>
-                  包裝說明
+                  <v-icon class="mr-2">mdi-form-select</v-icon>
+                  表單資料
                 </v-card-title>
                 <v-card-text>
-                  <div
-                    v-for="(section, key) in selectedApplication.packaging"
-                    :key="key"
-                    class="packaging-section"
-                  >
-                    <div class="packaging-section-title">
-                      {{ getPackagingSectionName(key) }}
-                    </div>
-                    <div class="packaging-section-content">
-                      <div v-if="section.options?.length" class="mb-2">
-                        <span class="text-grey-darken-1">選項：</span>
-                        <v-chip
-                          v-for="(option, index) in section.options"
-                          :key="index"
-                          class="ma-1"
-                          color="primary"
-                          size="small"
-                          variant="outlined"
-                        >
-                          {{ option }}
-                        </v-chip>
-                      </div>
-                      <div v-if="section.description">
-                        <span class="text-grey-darken-1">說明：</span>
-                        <span>{{ section.description }}</span>
-                      </div>
-                      <div
-                        v-if="!section.options?.length && !section.description"
-                        class="text-grey"
-                      >
-                        無資料
-                      </div>
-                    </div>
-                  </div>
+                  <DynamicFormRenderer
+                    :form-id="selectedFormId"
+                    :readonly="true"
+                    :record-id="selectedApplication.id"
+                    :show-actions="false"
+                    :show-title="false"
+                  />
                 </v-card-text>
               </v-card>
             </v-container>
           </v-card-text>
-
           <v-divider />
-
           <v-card-actions class="pa-4">
             <v-spacer />
             <v-btn
@@ -272,186 +255,149 @@
 </template>
 
 <script setup>
-  import { reactive, ref } from 'vue'
-  import { applicationsService } from '@/api/services/applications'
-  import { packagingService } from '@/api/services/packaging'
-  import { useSwal } from '@/composables/useSwal'
+import { reactive, ref } from 'vue'
+import { applicationsService } from '@/api/services/applications'
+import { formDataService } from '@/api/services/formData'
+import { useSwal } from '@/composables/useSwal'
+import DynamicFormRenderer from './DynamicFormRenderer.vue'
 
-  const swal = useSwal()
+const swal = useSwal()
+const formRef = ref(null)
+const queryResults = ref([])
+const detailDialog = ref(false)
+const selectedApplication = ref(null)
+const loading = ref(false)
+const loadingDetails = ref(false)
+const selectedApplicationId = ref(null)
+const selectedFormData = ref(null)
+const selectedFormId = ref(null)
 
-  const formRef = ref(null)
-  const queryResults = ref([])
-  const detailDialog = ref(false)
-  const selectedApplication = ref(null)
-  const loading = ref(false)
-  const loadingDetails = ref(false)
-  const selectedApplicationId = ref(null)
+const filters = reactive({
+  itemCode: '',
+  applicant: '',
+  status: '',
+  dateFrom: '',
+})
 
-  const filters = reactive({
+const statusOptions = [
+  { title: '全部', value: '' },
+  { title: '草稿', value: 'DRAFT' },
+  { title: '待審核', value: 'PENDING' },
+  { title: '審核中', value: 'IN_REVIEW' },
+  { title: '已核准', value: 'APPROVED' },
+  { title: '已退回', value: 'REJECTED' },
+  { title: '退回修改', value: 'RETURNED' },
+]
+
+const headers = [
+  { title: '申請日期', key: 'submit_date', sortable: true },
+  { title: '申請單號', key: 'id', sortable: true },
+  { title: '料號', key: 'item_code', sortable: true },
+  { title: '料件說明', key: 'item_name_cn', sortable: true },
+  { title: '申請人', key: 'applicant_name', sortable: true },
+  { title: '狀態', key: 'status', sortable: true },
+  { title: '操作', key: 'actions', sortable: false },
+]
+
+function formatDate (dateString) {
+  if (!dateString) return ''
+  return new Date(dateString).toLocaleDateString('zh-TW')
+}
+
+function getStatusColor (status) {
+  const statusMap = {
+    DRAFT: 'grey',
+    PENDING: 'warning',
+    IN_REVIEW: 'info',
+    APPROVED: 'success',
+    REJECTED: 'error',
+    RETURNED: 'warning',
+    SA_PENDING: 'warning',
+  }
+  return statusMap[status] || 'grey'
+}
+
+function getStatusText (status) {
+  const statusMap = {
+    DRAFT: '草稿',
+    PENDING: '待審核',
+    IN_REVIEW: '審核中',
+    APPROVED: '已核准',
+    REJECTED: '已退回',
+    RETURNED: '退回修改',
+    SA_PENDING: '待審核',
+  }
+  return statusMap[status] || status
+}
+
+async function searchApplications () {
+  loading.value = true
+  try {
+    const queryFilters = {}
+    if (filters.itemCode) {
+      queryFilters.itemCode = filters.itemCode
+    }
+    if (filters.applicant) {
+      queryFilters.applicant = filters.applicant
+    }
+    if (filters.status) {
+      queryFilters.status = filters.status
+    }
+    if (filters.dateFrom) {
+      queryFilters.dateFrom = filters.dateFrom
+    }
+    const results = await applicationsService.getApplications(queryFilters)
+    queryResults.value = results || []
+  } catch (error) {
+    console.error('查詢申請記錄失敗', error)
+    await swal.error('查詢失敗', error.message || '無法取得申請記錄')
+    queryResults.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+function clearQueryForm () {
+  Object.assign(filters, {
     itemCode: '',
     applicant: '',
     status: '',
     dateFrom: '',
   })
+  queryResults.value = []
+  formRef.value?.reset()
+}
 
-  const statusOptions = [
-    { title: '全部', value: '' },
-    { title: '待審核', value: 'PENDING' },
-    { title: '已核准', value: 'APPROVED' },
-    { title: '已退回', value: 'REJECTED' },
-  ]
-
-  const headers = [
-    { title: '申請日期', key: 'submit_date', sortable: true },
-    { title: '申請單號', key: 'id', sortable: true },
-    { title: '料號', key: 'item_code', sortable: true },
-    { title: '料件說明', key: 'item_name_cn', sortable: true },
-    { title: '申請人', key: 'applicant_name', sortable: true },
-    { title: '狀態', key: 'status', sortable: true },
-    { title: '操作', key: 'actions', sortable: false },
-  ]
-
-  function formatDate (dateString) {
-    if (!dateString) return ''
-    return new Date(dateString).toLocaleDateString('zh-TW')
-  }
-
-  function getStatusColor (status) {
-    const colors = {
-      PENDING: 'warning',
-      APPROVED: 'success',
-      REJECTED: 'error',
-    }
-    return colors[status] || 'grey'
-  }
-
-  function getStatusText (status) {
-    const texts = {
-      PENDING: '待審核',
-      APPROVED: '已核准',
-      REJECTED: '已退回',
-    }
-    return texts[status] || status
-  }
-
-  function getPackagingSectionName (key) {
-    const names = {
-      productPackaging: '1. 個別產品包裝',
-      accessoriesContent: '2. 配件內容',
-      accessories: '3. 配件',
-      innerBox: '4. 內盒',
-      outerBox: '5. 外箱',
-      transport: '6. 運輸與托盤要求',
-      container: '7. 裝櫃要求',
-      other: '8. 其他說明',
-    }
-    return names[key] || key
-  }
-
-  async function searchApplications () {
-    loading.value = true
-    try {
-      const queryFilters = {}
-      if (filters.itemCode) {
-        queryFilters.itemCode = filters.itemCode
-      }
-      if (filters.applicant) {
-        queryFilters.applicant = filters.applicant
-      }
-      if (filters.status) {
-        queryFilters.status = filters.status
-      }
-      if (filters.dateFrom) {
-        queryFilters.dateFrom = filters.dateFrom
-      }
-
-      const results = await applicationsService.getApplications(queryFilters)
-      queryResults.value = results || []
-    } catch (error) {
-      console.error('查詢申請記錄失敗', error)
-      await swal.error('查詢失敗', error.message || '無法取得申請記錄')
-      queryResults.value = []
-    } finally {
-      loading.value = false
-    }
-  }
-
-  function clearQueryForm () {
-    Object.assign(filters, {
-      itemCode: '',
-      applicant: '',
-      status: '',
-      dateFrom: '',
-    })
-    queryResults.value = []
-    formRef.value?.reset()
-  }
-
-  async function viewDetails (id) {
-    loadingDetails.value = true
-    selectedApplicationId.value = id
-    try {
-      // 獲取申請詳情
-      const application = await applicationsService.getApplication(id)
-      
-      // 獲取包裝數據
-      const packagingData = await packagingService.getApplicationPackaging(id)
-      
-      // 轉換包裝數據格式
-      const packaging = transformPackagingData(packagingData)
-      
-      selectedApplication.value = {
-        ...application,
-        packaging,
-      }
-      detailDialog.value = true
-    } catch (error) {
-      console.error('獲取申請詳情失敗', error)
-      await swal.error('載入失敗', error.message || '無法取得申請詳情')
-    } finally {
-      loadingDetails.value = false
-      selectedApplicationId.value = null
-    }
-  }
-
-  // 轉換包裝數據格式：從 Supabase 格式轉換為組件期望的格式
-  function transformPackagingData (packagingData) {
-    const result = {
-      productPackaging: { options: [], description: '' },
-      accessoriesContent: { options: [], description: '' },
-      accessories: { options: [], description: '' },
-      innerBox: { options: [], description: '' },
-      outerBox: { options: [], description: '' },
-      transport: { options: [], description: '' },
-      container: { options: [], description: '' },
-      other: { options: [], description: '' },
-    }
-
-    if (!packagingData || !Array.isArray(packagingData)) {
-      return result
-    }
-
-    // 按包裝類別分組（category code 直接對應 result 的 key）
-    for (const item of packagingData) {
-      const categoryCode = item.packaging_categories?.code
-      if (!categoryCode || !result[categoryCode]) {
-        continue
-      }
-
-      // 獲取選項名稱
-      const optionName = item.packaging_options?.name || item.packaging_options?.code
-      if (optionName && !result[categoryCode].options.includes(optionName)) {
-        result[categoryCode].options.push(optionName)
-      }
-
-      // 設置描述（如果有多個描述，使用第一個非空的）
-      if (item.description && !result[categoryCode].description) {
-        result[categoryCode].description = item.description
+async function viewDetails (id) {
+  loadingDetails.value = true
+  selectedApplicationId.value = id
+  try {
+    const application = await applicationsService.getApplication(id)
+    if (application.is_dynamic_form && application.form_id) {
+      try {
+        const formData = await formDataService.getFormData(application.form_id, id, {
+          includeFieldDefinitions: true,
+        })
+        selectedFormData.value = formData
+        selectedFormId.value = application.form_id
+      } catch (error) {
+        console.error('載入動態表單資料失敗', error)
+        selectedFormData.value = null
+        selectedFormId.value = null
       }
     }
-
-    return result
+    selectedApplication.value = {
+      ...application,
+    }
+    detailDialog.value = true
+  } catch (error) {
+    console.error('獲取申請詳情失敗', error)
+    await swal.error('載入失敗', error.message || '無法取得申請詳情')
+  } finally {
+    loadingDetails.value = false
+    selectedApplicationId.value = null
   }
+}
 </script>
 
 <style scoped lang="scss">
@@ -479,29 +425,5 @@
 .detail-value {
   color: rgba(0, 0, 0, 0.87);
   flex: 1;
-}
-
-.packaging-section {
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-
-  &:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
-  }
-}
-
-.packaging-section-title {
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.87);
-  margin-bottom: 8px;
-  font-size: 0.95rem;
-}
-
-.packaging-section-content {
-  padding-left: 16px;
-  color: rgba(0, 0, 0, 0.7);
 }
 </style>

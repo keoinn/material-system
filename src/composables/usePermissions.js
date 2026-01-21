@@ -17,6 +17,8 @@ const PERMISSIONS = {
   QUERY: ['admin', 'approver', 'applicant'], // 申請查詢
   SETTINGS: ['admin'], // 系統設定
   USERS: ['admin'], // 使用者管理
+  APPROVAL_WORKFLOW: ['admin'], // 審核流程設定
+  FORMS: ['admin'], // 表單管理
 }
 
 /**
@@ -88,6 +90,16 @@ export function usePermissions () {
    */
   const canUsers = computed(() => hasPermission('USERS'))
 
+  /**
+   * 檢查是否可以訪問審核流程設定
+   */
+  const canApprovalWorkflow = computed(() => hasPermission('APPROVAL_WORKFLOW'))
+
+  /**
+   * 檢查是否可以訪問表單管理
+   */
+  const canForms = computed(() => hasPermission('FORMS'))
+
   return {
     hasPermission,
     isAdmin,
@@ -100,6 +112,8 @@ export function usePermissions () {
     canQuery,
     canSettings,
     canUsers,
+    canApprovalWorkflow,
+    canForms,
   }
 }
 

@@ -5,6 +5,21 @@
     </v-card-title>
 
     <v-card-text class="pt-6">
+      <v-tabs v-model="activeTab" bg-color="grey-lighten-4">
+        <v-tab value="general">
+          <v-icon start>mdi-cog</v-icon>
+          一般設定
+        </v-tab>
+        <v-tab value="approval">
+          <v-icon start>mdi-sitemap</v-icon>
+          審核流程設定
+        </v-tab>
+      </v-tabs>
+
+      <v-window v-model="activeTab">
+        <!-- 一般設定 -->
+        <v-window-item value="general">
+          <div class="pt-4">
       <!-- 編碼規則設定 -->
       <div class="form-section">
         <h3>編碼規則設定</h3>
@@ -51,6 +66,16 @@
           </v-col>
         </v-row>
       </div>
+          </div>
+        </v-window-item>
+
+        <!-- 審核流程設定 -->
+        <v-window-item value="approval">
+          <div class="pt-4">
+            <ApprovalWorkflowSettings />
+          </div>
+        </v-window-item>
+      </v-window>
 
       <v-progress-linear
         v-if="loading"
@@ -87,9 +112,11 @@
   import { onMounted, reactive, ref } from 'vue'
   import { useSwal } from '@/composables/useSwal'
   import { settingsService } from '@/api/services/settings'
+  import ApprovalWorkflowSettings from './ApprovalWorkflowSettings.vue'
 
   const swal = useSwal()
 
+  const activeTab = ref('general')
   const codeFormat = ref('{大類}{中類}.{小類}.{流水號}')
   const loading = ref(false)
 

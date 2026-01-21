@@ -935,6 +935,29 @@ export default {
       }
     }
 
+    // 嘗試創建審核記錄（如果審核流程系統可用）
+    if (options.createRecord && userId && newRecordId) {
+      try {
+        // 動態導入審核流程服務（避免循環依賴）
+        const { approvalWorkflowsService } = await import('../approvalWorkflows.js')
+        
+        // 檢查是否已存在審核記錄
+        const existingRecord = await approvalWorkflowsService.getApprovalRecord(formIdValue, newRecordId)
+        
+        if (!existingRecord) {
+          // 創建審核記錄
+          await approvalWorkflowsService.createApprovalRecord({
+            form_id: formIdValue,
+            record_id: newRecordId,
+            applicant_id: userId,
+          })
+        }
+      } catch (approvalError) {
+        // 如果創建審核記錄失敗，記錄錯誤但不影響表單資料的創建
+        console.warn('創建審核記錄失敗（不影響表單資料創建）', approvalError)
+      }
+    }
+
     // 返回建立的資料
     return this.getFormData(formId, newRecordId, options)
   },

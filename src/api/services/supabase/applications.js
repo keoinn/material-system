@@ -9,15 +9,34 @@ import { isSupabaseAvailable, supabase } from '../../supabase.js'
  */
 export default {
   /**
-   * 取得申請列表
+   * 取得申請列表（使用 approval_records 和 form_data_values）
    */
   async getApplications (filters = {}) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
 
+    // 動態導入審核流程服務（避免循環依賴）
+    const { approvalWorkflowsService } = await import('../approvalWorkflows.js')
+
+    // 構建審核記錄的篩選條件
+    const approvalFilters = {
+      is_completed: filters.is_completed !== undefined ? filters.is_completed : undefined,
+    }
+
+    if (filters.status) {
+      approvalFilters.status_code = filters.status
+    }
+
+    if (filters.dateFrom) {
+      approvalFilters.dateFrom = filters.dateFrom
+    }
+
+    if (filters.dateTo) {
+      approvalFilters.dateTo = filters.dateTo
+    }
+
     // 如果 applicant 是字符串（姓名），先查找匹配的用戶 ID
-    let applicantIds = null
     if (filters.applicant && typeof filters.applicant === 'string') {
       const { data: matchingUsers } = await supabase
         .from('user_profiles')
@@ -25,258 +44,206 @@ export default {
         .ilike('username', `%${filters.applicant}%`)
 
       if (matchingUsers && matchingUsers.length > 0) {
-        applicantIds = matchingUsers.map(u => u.id)
+        approvalFilters.applicant_id = matchingUsers[0].id // 使用第一個匹配的用戶
       } else {
         // 如果沒有找到匹配的用戶，返回空結果
         return []
       }
+    } else if (filters.applicant) {
+      approvalFilters.applicant_id = filters.applicant
     }
 
-    // 獲取表單 ID（用於查詢動態表單資料）
-    const { data: formData } = await supabase
-      .from('forms')
-      .select('id, form_code')
-      .eq('form_code', 'material_application')
-      .single()
+    // 獲取所有審核記錄（包含已完成和待審核的）
+    const approvalRecords = await approvalWorkflowsService.getAllApprovalApplications(approvalFilters)
 
-    const formId = formData?.id || null
+    // 為每個審核記錄獲取表單資料
+    const applications = await Promise.all(
+      approvalRecords.map(async (record) => {
+        try {
+          // 從 form_data_values 獲取表單資料
+          const { formDataService } = await import('../formData.js')
+          const formData = await formDataService.getFormData(record.form_id, record.record_id, {
+            includeFieldDefinitions: true,
+          })
 
-    // 查詢 applications 表中的申請
-    let query = supabase
-      .from('applications')
-      .select(`
-        *,
-        applicant:user_profiles!applications_applicant_id_fkey (
-          id,
-          username
-        )
-      `)
+          // 提取關鍵欄位值
+          const values = formData?.values || {}
+          const fields = formData?.fields || []
 
-    // 應用篩選條件
-    if (filters.status && filters.status !== 'ALL') {
-      query = query.eq('status', filters.status)
-    }
+          // 查找欄位定義以確定正確的 field_key
+          // 料號可能對應到 system_code 或 item_code
+          const systemCodeField = fields.find(f => f.field_key === 'system_code' || f.field_key === 'systemCode')
+          const itemCodeField = systemCodeField || fields.find(f => f.field_key === 'item_code' || f.field_key === 'itemCode')
 
-    if (filters.itemCode) {
-      query = query.ilike('item_code', `%${filters.itemCode}%`)
-    }
-
-    if (filters.applicant) {
-      if (applicantIds) {
-        // 使用查詢到的用戶 ID 列表
-        query = query.in('applicant_id', applicantIds)
-      } else if (typeof filters.applicant !== 'string') {
-        // 如果 applicant 是 ID，直接查詢
-        query = query.eq('applicant_id', filters.applicant)
-      }
-    }
-
-    if (filters.dateFrom) {
-      // 確保日期格式正確，設置為當天開始時間
-      const dateFrom = new Date(filters.dateFrom)
-      dateFrom.setHours(0, 0, 0, 0)
-      query = query.gte('submit_date', dateFrom.toISOString())
-    }
-
-    if (filters.dateTo) {
-      // 確保日期格式正確，設置為當天結束時間
-      const dateTo = new Date(filters.dateTo)
-      dateTo.setHours(23, 59, 59, 999)
-      query = query.lte('submit_date', dateTo.toISOString())
-    }
-
-    if (filters.mainCategory) {
-      query = query.eq('main_category_id', filters.mainCategory)
-    }
-
-    // 排序
-    query = query.order('submit_date', { ascending: false })
-
-    const { data: applicationsData, error } = await query
-
-    if (error) {
-      throw error
-    }
-
-    // 查詢動態表單申請（form_data_values 中有資料但 applications 表中可能沒有記錄的）
-    let dynamicFormApplications = []
-    if (formId) {
-      // 查詢所有待審核的動態表單資料
-      const { data: formValuesData } = await supabase
-        .from('form_data_values')
-        .select('record_id, created_by_id, created_at')
-        .eq('form_id', formId)
-        .order('created_at', { ascending: false })
-
-      if (formValuesData && formValuesData.length > 0) {
-        // 獲取所有唯一的 record_id
-        const recordIds = [...new Set(formValuesData.map(fv => fv.record_id))]
-
-        // 檢查哪些 record_id 在 applications 表中不存在
-        const existingRecordIds = new Set((applicationsData || []).map(app => app.id))
-        const missingRecordIds = recordIds.filter(rid => !existingRecordIds.has(rid))
-
-        // 對於缺失的記錄，嘗試從 form_data_values 提取資料創建臨時申請記錄
-        for (const recordId of missingRecordIds) {
-          // 檢查是否為臨時 ID（時間戳格式）
-          const isTempId = typeof recordId === 'number' && recordId > 1000000000000
-
-          if (isTempId) {
-            // 這是臨時 ID，需要創建 applications 記錄
-            // 提取關鍵欄位值
-            const { data: itemCodeData } = await supabase
-              .from('form_data_values')
-              .select('field_value')
-              .eq('form_id', formId)
-              .eq('record_id', recordId)
-              .eq('field_key', 'item_code')
-              .single()
-
-            const { data: itemNameCNData } = await supabase
-              .from('form_data_values')
-              .select('field_value')
-              .eq('form_id', formId)
-              .eq('record_id', recordId)
-              .eq('field_key', 'item_name_cn')
-              .single()
-
-            const { data: itemNameENData } = await supabase
-              .from('form_data_values')
-              .select('field_value')
-              .eq('form_id', formId)
-              .eq('record_id', recordId)
-              .eq('field_key', 'item_name_en')
-              .single()
-
-            const itemCode = itemCodeData?.field_value || `TEMP-${recordId}`
-            const itemNameCN = itemNameCNData?.field_value || '未命名物料'
-            const itemNameEN = itemNameENData?.field_value || 'Unnamed Material'
-
-            // 獲取申請人 ID
-            const formValueRecord = formValuesData.find(fv => fv.record_id === recordId)
-            const applicantId = formValueRecord?.created_by_id
-
-            // 創建 applications 記錄
-            const { data: newApplication, error: createError } = await supabase
-              .from('applications')
-              .insert({
-                item_code: itemCode,
-                item_name_cn: itemNameCN,
-                item_name_en: itemNameEN,
-                applicant_id: applicantId,
-                status: 'PENDING',
-                approval_status: 'PENDING',
-                submit_date: formValueRecord?.created_at || new Date().toISOString(),
-              })
-              .select(`
-                *,
-                applicant:user_profiles!applications_applicant_id_fkey (
-                  id,
-                  username
-                )
-              `)
-              .single()
-
-            if (!createError && newApplication) {
-              // 更新 form_data_values 中的 record_id
-              await supabase
-                .from('form_data_values')
-                .update({ record_id: newApplication.id })
-                .eq('form_id', formId)
-                .eq('record_id', recordId)
-
-              // 添加到結果中
-              dynamicFormApplications.push(newApplication)
+          let itemCode = values.system_code || values.systemCode || values.item_code || values.itemCode
+          // 如果是聚合欄位，嘗試重新計算
+          if (itemCodeField && itemCodeField.field_type === 'aggregated' && itemCodeField.field_config?.template) {
+            try {
+              const { formDataService: formDataSvc } = await import('../formData.js')
+              itemCode = await formDataSvc._calculateAggregatedValue(
+                itemCodeField.field_config.template,
+                values,
+                itemCodeField.field_config.counterKey || itemCodeField.field_key,
+              )
+            } catch (error) {
+              console.warn('重新計算聚合料號失敗，使用原始值', error)
             }
           }
+          if (!itemCode || itemCode === '') {
+            itemCode = 'N/A'
+          }
+
+          // 料件說明可能對應到 materials_desc_cn 或 item_name_cn
+          const itemNameCN = values.materials_desc_cn || values.materialsDescCN || values.item_name_cn || values.itemNameCN || 'N/A'
+          const itemNameEN = values.item_name_en || values.itemNameEN || 'N/A'
+
+          // 如果篩選條件包含 itemCode，進行過濾
+          if (filters.itemCode && !itemCode.toLowerCase().includes(filters.itemCode.toLowerCase())) {
+            return null
+          }
+
+          return {
+            id: record.record_id,
+            record_id: record.record_id,
+            item_code: itemCode,
+            item_name_cn: itemNameCN,
+            item_name_en: itemNameEN,
+            material: values.material || null,
+            surface_finish: values.surface_finish || values.surfaceFinish || null,
+            dimensions: values.dimensions || null,
+            customer_ref: values.customer_ref || values.customerRef || null,
+            applicant_id: record.applicant_id,
+            applicant_name: record.applicant_username || 'Unknown',
+            status: record.current_status_code,
+            approval_status: record.current_status_code,
+            submit_date: record.submit_date,
+            approval_date: record.approval_date,
+            reject_date: record.reject_date,
+            reject_reason: record.reject_reason,
+            is_dynamic_form: true,
+            form_id: record.form_id,
+            // 審核流程相關資訊
+            current_status_code: record.current_status_code,
+            current_status_name: record.current_status_name,
+            status_color: record.status_color,
+            status_icon: record.status_icon,
+            current_step_name: record.current_step_name,
+            workflow_name: record.workflow_name,
+          }
+        } catch (error) {
+          console.error(`載入申請 ${record.record_id} 的表單資料失敗`, error)
+          // 即使載入表單資料失敗，也返回基本資訊
+          return {
+            id: record.record_id,
+            record_id: record.record_id,
+            item_code: 'N/A',
+            item_name_cn: 'N/A',
+            item_name_en: 'N/A',
+            applicant_id: record.applicant_id,
+            applicant_name: record.applicant_username || 'Unknown',
+            status: record.current_status_code,
+            approval_status: record.current_status_code,
+            submit_date: record.submit_date,
+            is_dynamic_form: true,
+            form_id: record.form_id,
+            current_status_code: record.current_status_code,
+            current_status_name: record.current_status_name,
+            status_color: record.status_color,
+            status_icon: record.status_icon,
+            current_step_name: record.current_step_name,
+            workflow_name: record.workflow_name,
+          }
         }
-      }
+      })
+    )
 
-      // 批量查詢動態表單標記（一次性查詢所有申請的 form_data_values）
-      const allApplicationIds = [
-        ...(applicationsData || []).map(app => app.id),
-        ...dynamicFormApplications.map(app => app.id),
-      ]
-
-      let dynamicFormRecordIds = new Set()
-      if (allApplicationIds.length > 0) {
-        const { data: formValues } = await supabase
-          .from('form_data_values')
-          .select('record_id')
-          .eq('form_id', formId)
-          .in('record_id', allApplicationIds)
-
-        if (formValues) {
-          dynamicFormRecordIds = new Set(formValues.map(fv => fv.record_id))
-        }
-      }
-    }
-
-    // 合併 applications 表中的申請和動態表單申請
-    const allApplications = [...(applicationsData || []), ...dynamicFormApplications]
-
-    // 處理申請人資訊和動態表單標記
-    return allApplications.map(app => ({
-      ...app,
-      applicant_name: app.applicant?.username || 'Unknown',
-      is_dynamic_form: formId ? (dynamicFormRecordIds?.has(app.id) || false) : false,
-      form_id: formId,
-    }))
+    // 過濾掉 null 值（不符合 itemCode 篩選條件的）
+    return applications.filter(app => app !== null)
   },
 
   /**
-   * 取得單一申請
+   * 取得單一申請（使用 approval_records 和 form_data_values）
    */
   async getApplication (id) {
     if (!isSupabaseAvailable()) {
       throw new Error('Supabase 客戶端未初始化')
     }
 
-    // 先從 applications 表查詢
-    const { data: appData, error: appError } = await supabase
-      .from('applications')
-      .select(`
-        *,
-        applicant:user_profiles!applications_applicant_id_fkey (
-          id,
-          username
+    // 動態導入服務
+    const { approvalWorkflowsService } = await import('../approvalWorkflows.js')
+    const { formDataService } = await import('../formData.js')
+
+    // 查找所有審核記錄，找到對應的 record_id
+    const allRecords = await approvalWorkflowsService.getAllApprovalApplications({})
+    const record = allRecords.find(r => r.record_id === id || r.approval_record_id === id)
+
+    if (!record) {
+      throw new Error('找不到申請記錄')
+    }
+
+    // 從 form_data_values 獲取表單資料（包含欄位定義以便查找正確的 field_key）
+    const formData = await formDataService.getFormData(record.form_id, record.record_id, {
+      includeFieldDefinitions: true,
+    })
+
+    // 提取關鍵欄位值
+    const values = formData?.values || {}
+    const fields = formData?.fields || []
+
+    // 查找欄位定義以確定正確的 field_key
+    // 料號可能對應到 system_code 或 item_code
+    const systemCodeField = fields.find(f => f.field_key === 'system_code' || f.field_key === 'systemCode')
+    const itemCodeField = systemCodeField || fields.find(f => f.field_key === 'item_code' || f.field_key === 'itemCode')
+    
+    let itemCode = values.system_code || values.systemCode || values.item_code || values.itemCode
+    // 如果是聚合欄位，嘗試重新計算
+    if (itemCodeField && itemCodeField.field_type === 'aggregated' && itemCodeField.field_config?.template) {
+      try {
+        const { formDataService: formDataSvc } = await import('../formData.js')
+        itemCode = await formDataSvc._calculateAggregatedValue(
+          itemCodeField.field_config.template,
+          values,
+          itemCodeField.field_config.counterKey || itemCodeField.field_key,
         )
-      `)
-      .eq('id', id)
-      .single()
-
-    if (appError) {
-      throw appError
+      } catch (error) {
+        console.warn('重新計算聚合料號失敗，使用原始值', error)
+      }
+    }
+    if (!itemCode || itemCode === '') {
+      itemCode = 'N/A'
     }
 
-    // 檢查是否為動態表單申請
-    const { data: formData } = await supabase
-      .from('forms')
-      .select('id, form_code')
-      .eq('form_code', 'material_application')
-      .single()
-
-    let isDynamicForm = false
-    let formId = null
-
-    if (formData) {
-      formId = formData.id
-      // 檢查是否有對應的 form_data_values
-      const { data: formValues } = await supabase
-        .from('form_data_values')
-        .select('id')
-        .eq('form_id', formId)
-        .eq('record_id', id)
-        .limit(1)
-
-      isDynamicForm = formValues && formValues.length > 0
-    }
+    // 料件說明可能對應到 materials_desc_cn 或 item_name_cn
+    const itemNameCN = values.materials_desc_cn || values.materialsDescCN || values.item_name_cn || values.itemNameCN || 'N/A'
+    const itemNameEN = values.item_name_en || values.itemNameEN || 'N/A'
 
     return {
-      ...appData,
-      applicant_name: appData.applicant?.username || 'Unknown',
-      is_dynamic_form: isDynamicForm,
-      form_id: formId,
+      id: record.record_id,
+      record_id: record.record_id,
+      item_code: itemCode,
+      item_name_cn: itemNameCN,
+      item_name_en: itemNameEN,
+      material: values.material || null,
+      surface_finish: values.surface_finish || values.surfaceFinish || null,
+      dimensions: values.dimensions || null,
+      customer_ref: values.customer_ref || values.customerRef || null,
+      applicant_id: record.applicant_id,
+      applicant_name: record.applicant_username || 'Unknown',
+      status: record.current_status_code,
+      approval_status: record.current_status_code,
+      submit_date: record.submit_date,
+      approval_date: record.approval_date,
+      reject_date: record.reject_date,
+      reject_reason: record.reject_reason,
+      is_dynamic_form: true,
+      form_id: record.form_id,
+      // 審核流程相關資訊
+      current_status_code: record.current_status_code,
+      current_status_name: record.current_status_name,
+      status_color: record.status_color,
+      status_icon: record.status_icon,
+      current_step_name: record.current_step_name,
+      workflow_name: record.workflow_name,
     }
   },
 

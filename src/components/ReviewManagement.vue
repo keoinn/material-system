@@ -25,11 +25,11 @@
 
         <template v-slot:[`item.status`]="{ item }">
           <v-chip
-            :color="getStatusColor(item.status)"
+            :color="getStatusColor(item.current_status_code || item.status)"
             size="small"
             variant="flat"
           >
-            {{ getStatusText(item.status) }}
+            {{ item.current_status_name || getStatusText(item.current_status_code || item.status) }}
           </v-chip>
         </template>
 
@@ -70,8 +70,8 @@
       <v-dialog
         v-model="detailDialog"
         max-width="900"
-        scrollable
         persistent
+        scrollable
       >
         <v-card v-if="selectedApplication">
           <v-card-title class="d-flex align-center bg-primary text-white">
@@ -154,11 +154,11 @@
                       <div class="detail-item">
                         <span class="detail-label">狀態：</span>
                         <v-chip
-                          :color="getStatusColor(selectedApplication.status)"
+                          :color="getStatusColor(selectedApplication.current_status_code || selectedApplication.status)"
                           size="small"
                           variant="flat"
                         >
-                          {{ getStatusText(selectedApplication.status) }}
+                          {{ selectedApplication.current_status_name || getStatusText(selectedApplication.current_status_code || selectedApplication.status) }}
                         </v-chip>
                       </div>
                     </v-col>
@@ -179,10 +179,10 @@
                 <v-card-text>
                   <DynamicFormRenderer
                     :form-id="selectedFormId"
+                    :readonly="true"
                     :record-id="selectedApplication.id"
                     :show-actions="false"
                     :show-title="false"
-                    :readonly="true"
                   />
                 </v-card-text>
               </v-card>
@@ -276,11 +276,8 @@
 
 <script setup>
   import { computed, onMounted, ref } from 'vue'
-  import { applicationsService } from '@/api/services/applications'
+  import { approvalWorkflowsService } from '@/api/services/approvalWorkflows'
   import { formDataService } from '@/api/services/formData'
-  import { formsService } from '@/api/services/forms'
-  import { packagingService } from '@/api/services/packaging'
-  import { categoriesService } from '@/api/services/categories'
   import { useSwal } from '@/composables/useSwal'
   import { useAuthStore } from '@/stores/auth'
   import DynamicFormRenderer from './DynamicFormRenderer.vue'
@@ -310,54 +307,119 @@
     { title: '操作', key: 'actions', sortable: false },
   ]
 
-  // 載入待審核申請列表（從 form_data_values 讀取）
+  // 載入待審核申請列表（從 approval_records 讀取）
   async function loadPendingApplications () {
     loading.value = true
     try {
-      // 嘗試獲取 material_application 表單，如果不存在則查詢所有表單的資料
-      let formData = null
-      let formId = null
+      // 使用審核流程系統獲取待審核申請
+      const approvalRecords = await approvalWorkflowsService.getPendingApprovalApplications()
 
-      try {
-        formData = await formsService.getForm('material_application', false)
-        if (formData) {
-          formId = formData.id
-        }
-      } catch (error) {
-        // 如果找不到表單，嘗試查詢所有 active 的表單
-        console.warn('找不到 material_application 表單，嘗試查詢所有表單', error)
-        try {
-          const allForms = await formsService.getForms({ is_active: true })
-          if (allForms && allForms.length > 0) {
-            // 優先使用預設表單，否則使用第一個
-            formData = allForms.find(f => f.is_default) || allForms[0]
-            if (formData) {
-              formId = formData.id
+      // 為每個審核記錄獲取表單資料
+      const applicationsWithData = await Promise.all(
+        approvalRecords.map(async record => {
+          try {
+            // 從 form_data_values 獲取表單資料（包含欄位定義以便查找正確的 field_key）
+            const formData = await formDataService.getFormData(record.form_id, record.record_id, {
+              includeFieldDefinitions: true,
+            })
+
+            // 提取關鍵欄位值
+            const values = formData?.values || {}
+            const fields = formData?.fields || []
+
+            // 查找欄位定義以確定正確的 field_key
+            // 料號對應到「系統編碼」欄位（system_code）
+            const systemCodeField = fields.find(f => f.field_key === 'system_code' || f.field_key === 'systemCode')
+            const itemCodeField = systemCodeField || fields.find(f => f.field_key === 'item_code' || f.field_key === 'itemCode')
+
+            let itemCode = values.system_code || values.systemCode || values.item_code || values.itemCode
+            // 如果是聚合欄位，嘗試重新計算
+            if (itemCodeField && itemCodeField.field_type === 'aggregated' && itemCodeField.field_config?.template) {
+              try {
+                itemCode = await formDataService._calculateAggregatedValue(
+                  itemCodeField.field_config.template,
+                  values,
+                  itemCodeField.field_config.counterKey || itemCodeField.field_key,
+                )
+              } catch (error) {
+                console.warn('重新計算聚合料號失敗，使用原始值', error)
+              }
+            }
+            if (!itemCode || itemCode === '') {
+              itemCode = 'N/A'
+            }
+
+            // 料件說明對應到「料件說明 (中文)」欄位（materials_desc_cn）
+            const itemNameCN = values.materials_desc_cn || values.materialsDescCN || values.item_name_cn || values.itemNameCN || 'N/A'
+            const itemNameEN = values.item_name_en || values.itemNameEN || 'N/A'
+
+            return {
+              id: record.record_id,
+              record_id: record.record_id,
+              approval_record_id: record.approval_record_id,
+              form_id: record.form_id,
+              submit_date: record.submit_date,
+              submitDate: record.submit_date,
+              item_code: itemCode,
+              itemCode: itemCode,
+              item_name_cn: itemNameCN,
+              itemNameCN: itemNameCN,
+              item_name_en: itemNameEN,
+              itemNameEN: itemNameEN,
+              applicant: record.applicant_username || 'Unknown',
+              applicant_name: record.applicant_username || 'Unknown',
+              // 審核流程相關資訊
+              current_status_code: record.current_status_code,
+              current_status_name: record.current_status_name,
+              status_color: record.status_color,
+              status_icon: record.status_icon,
+              current_step_name: record.current_step_name,
+              current_step_order: record.current_step_order,
+              workflow_name: record.workflow_name,
+              workflow_code: record.workflow_code,
+              // 兼容舊的狀態欄位
+              status: record.current_status_code,
+              isDynamicForm: true,
+              formId: record.form_id,
+            }
+          } catch (error) {
+            console.error(`載入申請 ${record.record_id} 的表單資料失敗`, error)
+            // 即使載入表單資料失敗，也返回基本資訊
+            return {
+              id: record.record_id,
+              record_id: record.record_id,
+              approval_record_id: record.approval_record_id,
+              form_id: record.form_id,
+              submit_date: record.submit_date,
+              submitDate: record.submit_date,
+              item_code: 'N/A',
+              itemCode: 'N/A',
+              item_name_cn: 'N/A',
+              itemNameCN: 'N/A',
+              item_name_en: 'N/A',
+              itemNameEN: 'N/A',
+              applicant: record.applicant_username || 'Unknown',
+              applicant_name: record.applicant_username || 'Unknown',
+              current_status_code: record.current_status_code,
+              current_status_name: record.current_status_name,
+              status_color: record.status_color,
+              status_icon: record.status_icon,
+              current_step_name: record.current_step_name,
+              current_step_order: record.current_step_order,
+              workflow_name: record.workflow_name,
+              workflow_code: record.workflow_code,
+              status: record.current_status_code,
+              isDynamicForm: true,
+              formId: record.form_id,
             }
           }
-        } catch (formsError) {
-          console.warn('無法查詢表單列表，將查詢所有 form_data_values', formsError)
-          // 如果無法查詢表單，formId 保持為 null，會查詢所有表單的資料
-        }
-      }
+        }),
+      )
 
-      // 從 form_data_values 讀取待審核申請（如果 formId 為 null，會查詢所有表單的資料）
-      const data = await formDataService.getPendingFormDataList(formId, { status: 'PENDING' })
-
-      // 轉換數據格式以符合組件需求
-      applications.value = data.map((app) => ({
-        ...app,
-        submitDate: app.submit_date,
-        itemCode: app.item_code,
-        itemNameCN: app.item_name_cn,
-        itemNameEN: app.item_name_en,
-        applicant: app.applicant_name || app.applicant?.username || 'Unknown',
-        isDynamicForm: true, // 所有從 form_data_values 讀取的都標記為動態表單
-        formId: app.form_id || formData?.id || null,
-      }))
+      applications.value = applicationsWithData
     } catch (error) {
       console.error('載入待審核申請失敗', error)
-      await swal.error('載入待審核申請失敗，請重新整理頁面')
+      await swal.error('載入待審核申請失敗', error.message || '請重新整理頁面')
     } finally {
       loading.value = false
     }
@@ -369,21 +431,29 @@
   }
 
   function getStatusColor (status) {
-    const colors = {
+    // 如果狀態有對應的顏色，使用它；否則使用預設顏色
+    const statusMap = {
+      DRAFT: 'grey',
       PENDING: 'warning',
+      IN_REVIEW: 'info',
       APPROVED: 'success',
       REJECTED: 'error',
+      RETURNED: 'warning',
     }
-    return colors[status] || 'grey'
+    return statusMap[status] || 'grey'
   }
 
   function getStatusText (status) {
-    const texts = {
+    // 如果狀態有對應的文本，使用它；否則直接顯示狀態代碼
+    const statusMap = {
+      DRAFT: '草稿',
       PENDING: '待審核',
+      IN_REVIEW: '審核中',
       APPROVED: '已核准',
       REJECTED: '已退回',
+      RETURNED: '退回修改',
     }
-    return texts[status] || status
+    return statusMap[status] || status
   }
 
   function getPackagingSectionName (key) {
@@ -406,26 +476,55 @@
       loading.value = true
       try {
         const approverId = authStore.currentUser?.id
-        // 從 form_data_values 更新狀態
-        const application = applications.value.find(app => app.id === id || app.record_id === id)
-        if (!application || !application.formId) {
-          throw new Error('找不到申請記錄或表單 ID')
+        if (!approverId) {
+          throw new Error('無法取得審核人資訊，請重新登入')
         }
 
-        // 更新 form_data_values 中的 status 和 approval_status
-        await formDataService.updateFormData(application.formId, id, {
-          status: 'APPROVED',
-          approval_status: 'APPROVED',
-          approver_id: approverId,
-          approval_date: new Date().toISOString(),
-        })
+        // 從列表中查找申請資訊
+        const application = applications.value.find(app =>
+          app.id === id
+          || app.record_id === id
+          || app.approval_record_id === id,
+        )
 
-        await swal.success('申請已核准！')
+        if (!application) {
+          throw new Error('找不到申請記錄')
+        }
+
+        // 使用審核流程系統執行核准操作
+        if (application.approval_record_id) {
+          await approvalWorkflowsService.executeApprovalAction({
+            approval_record_id: application.approval_record_id,
+            action: 'APPROVE',
+            approver_id: approverId,
+            comment: '審核通過',
+          })
+          await swal.success('申請已核准！')
+        } else {
+          // 如果沒有審核記錄，嘗試取得
+          const approvalRecord = await approvalWorkflowsService.getApprovalRecord(
+            application.form_id || application.formId,
+            application.record_id || application.id,
+          )
+
+          if (approvalRecord) {
+            await approvalWorkflowsService.executeApprovalAction({
+              approval_record_id: approvalRecord.id,
+              action: 'APPROVE',
+              approver_id: approverId,
+              comment: '審核通過',
+            })
+            await swal.success('申請已核准！')
+          } else {
+            throw new Error('找不到審核記錄，無法執行核准操作')
+          }
+        }
+
         // 重新載入列表
         await loadPendingApplications()
       } catch (error) {
         console.error('核准申請失敗', error)
-        await swal.error('核准申請失敗，請稍後再試')
+        await swal.error('核准申請失敗', error.message || '請稍後再試')
       } finally {
         loading.value = false
       }
@@ -447,29 +546,59 @@
     loading.value = true
     try {
       const approverId = authStore.currentUser?.id
-      // 從 form_data_values 更新狀態
-      const application = applications.value.find(app => app.id === rejectApplicationId.value || app.record_id === rejectApplicationId.value)
-      if (!application || !application.formId) {
-        throw new Error('找不到申請記錄或表單 ID')
+      if (!approverId) {
+        throw new Error('無法取得審核人資訊，請重新登入')
       }
 
-      // 更新 form_data_values 中的 status 和 approval_status
-      await formDataService.updateFormData(application.formId, rejectApplicationId.value, {
-        status: 'REJECTED',
-        approval_status: 'REJECTED',
-        reject_reason: rejectReason.value,
-        approver_id: approverId,
-        reject_date: new Date().toISOString(),
-      })
+      // 從列表中查找申請資訊
+      const application = applications.value.find(app =>
+        app.id === rejectApplicationId.value
+        || app.record_id === rejectApplicationId.value
+        || app.approval_record_id === rejectApplicationId.value,
+      )
+
+      if (!application) {
+        throw new Error('找不到申請記錄')
+      }
+
+      // 使用審核流程系統執行退回操作
+      if (application.approval_record_id) {
+        await approvalWorkflowsService.executeApprovalAction({
+          approval_record_id: application.approval_record_id,
+          action: 'REJECT',
+          approver_id: approverId,
+          reason: rejectReason.value,
+          comment: rejectReason.value,
+        })
+        await swal.success('申請已退回！')
+      } else {
+        // 如果沒有審核記錄，嘗試取得
+        const approvalRecord = await approvalWorkflowsService.getApprovalRecord(
+          application.form_id || application.formId,
+          application.record_id || application.id,
+        )
+
+        if (approvalRecord) {
+          await approvalWorkflowsService.executeApprovalAction({
+            approval_record_id: approvalRecord.id,
+            action: 'REJECT',
+            approver_id: approverId,
+            reason: rejectReason.value,
+            comment: rejectReason.value,
+          })
+          await swal.success('申請已退回！')
+        } else {
+          throw new Error('找不到審核記錄，無法執行退回操作')
+        }
+      }
 
       rejectDialog.value = false
       rejectReason.value = ''
-      await swal.success('申請已退回！')
       // 重新載入列表
       await loadPendingApplications()
     } catch (error) {
       console.error('退回申請失敗', error)
-      await swal.error('退回申請失敗，請稍後再試')
+      await swal.error('退回申請失敗', error.message || '請稍後再試')
     } finally {
       loading.value = false
     }
@@ -502,12 +631,12 @@
       const formFields = selectedFormData.value?.fields || []
 
       // 查找對應的欄位 field_key
-      const findFieldKeyByLabel = (label) => {
-        const field = formFields.find(f => 
-          f.field_label === label || 
-          f.field_label_en === label ||
-          f.field_label?.includes(label) ||
-          f.field_label_en?.includes(label)
+      const findFieldKeyByLabel = label => {
+        const field = formFields.find(f =>
+          f.field_label === label
+          || f.field_label_en === label
+          || f.field_label?.includes(label)
+          || f.field_label_en?.includes(label),
         )
         return field?.field_key
       }
@@ -564,9 +693,9 @@
         itemNameEN: formValues[itemNameENKey] || application.item_name_en,
         material: materialLabel || materialValue || 'N/A',
         surfaceFinish: formValues[surfaceFinishKey] || application.surface_finish,
-        applicant: application.applicant_name || 
-                  application.applicant?.username || 
-                  'Unknown',
+        applicant: application.applicant_name
+          || application.applicant?.username
+          || 'Unknown',
         isDynamicForm: true,
       }
 
