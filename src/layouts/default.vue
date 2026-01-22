@@ -189,7 +189,7 @@
 </template>
 
 <script setup>
-  import { computed, ref } from 'vue'
+  import { computed, onMounted, ref, watch } from 'vue'
   import { useRouter } from 'vue-router'
   import AppFooter from '@/components/AppFooter.vue'
   import { usePermissions } from '@/composables/usePermissions'
@@ -200,6 +200,7 @@
   const authStore = useAuthStore()
   const applicationsStore = useApplicationsStore()
   const {
+    loadUserPagePermissions,
     canApply,
     canPackaging,
     canReview,
@@ -213,6 +214,24 @@
 
   const drawer = ref(false)
   const pendingCount = computed(() => applicationsStore.pendingCount)
+
+  // 監聽使用者登入狀態和角色變化，重新載入權限
+  watch(
+    () => [authStore.isLoggedIn, authStore.userRole],
+    ([isLoggedIn, userRole]) => {
+      if (isLoggedIn && userRole) {
+        loadUserPagePermissions()
+      }
+    },
+    { immediate: true },
+  )
+
+  // 組件掛載時載入權限
+  onMounted(() => {
+    if (authStore.isLoggedIn && authStore.userRole) {
+      loadUserPagePermissions()
+    }
+  })
 
   /**
    * 將角色代碼轉換為中文顯示

@@ -482,33 +482,13 @@ ON CONFLICT (form_id, field_key) DO UPDATE SET
   updated_at = EXCLUDED.updated_at;
 
 -- 匯入 system_options 記錄
+-- 注意：已移除以下 module 的記錄：
+--       - application_query
+--       - review_management
+--       - system_settings
+--       - excel_export
+-- 僅保留 attachment_management 的記錄
 INSERT INTO "public"."system_options" ("id", "module", "cate", "parent_key", "key", "value", "label", "desc", "created_at", "updated_at") VALUES 
-('1', 'application_query', 'applicationStatus', null, 'PENDING', 'PENDING', '待審核', '等待審核中', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('2', 'application_query', 'applicationStatus', null, 'APPROVED', 'APPROVED', '已核准', '已通過審核', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('3', 'application_query', 'applicationStatus', null, 'REJECTED', 'REJECTED', '已退回', '已退回修改', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('4', 'application_query', 'applicationStatus', null, 'ALL', 'ALL', '全部', '所有狀態', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('5', 'review_management', 'applicationStatus', null, 'PENDING', 'PENDING', '待審核', '等待審核中', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('6', 'review_management', 'applicationStatus', null, 'APPROVED', 'APPROVED', '已核准', '已通過審核', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('7', 'review_management', 'applicationStatus', null, 'REJECTED', 'REJECTED', '已退回', '已退回修改', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('8', 'excel_export', 'applicationStatus', null, 'ALL', 'ALL', '全部', '所有狀態', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('9', 'excel_export', 'applicationStatus', null, 'APPROVED', 'APPROVED', '已核准', '已通過審核', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('10', 'excel_export', 'applicationStatus', null, 'PENDING', 'PENDING', '待審核', '等待審核中', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('11', 'excel_export', 'applicationStatus', null, 'REJECTED', 'REJECTED', '已退回', '已退回修改', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('15', 'review_management', 'approvalAction', null, 'SUBMIT', 'SUBMIT', '提交', '提交申請', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('16', 'review_management', 'approvalAction', null, 'APPROVE', 'APPROVE', '核准', '核准申請', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('17', 'review_management', 'approvalAction', null, 'REJECT', 'REJECT', '退回', '退回申請', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('18', 'review_management', 'approvalAction', null, 'RETURN', 'RETURN', '退回修改', '退回修改', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('22', 'system_settings', 'serialDigits', null, '4', '4', '4位數', '0001-9999', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('23', 'system_settings', 'serialDigits', null, '5', '5', '5位數', '00001-99999', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('24', 'system_settings', 'serialDigits', null, '6', '6', '6位數', '000001-999999', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('25', 'system_settings', 'boolean', null, 'true', 'true', '開啟', '啟用此功能', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('26', 'system_settings', 'boolean', null, 'false', 'false', '關閉', '停用此功能', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('27', 'system_settings', 'approvalLevel', null, '1', '1', '單層審核', '只需一層審核', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('28', 'system_settings', 'approvalLevel', null, '2', '2', '雙層審核', '需要兩層審核', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('29', 'system_settings', 'approvalLevel', null, '3', '3', '三層審核', '需要三層審核', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('30', 'excel_export', 'exportFormat', null, 'CSV', 'CSV', 'CSV', '逗號分隔值檔案', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('31', 'excel_export', 'exportFormat', null, 'XLSX', 'XLSX', 'Excel', 'Excel檔案格式', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
-('32', 'excel_export', 'exportFormat', null, 'PDF', 'PDF', 'PDF', 'PDF檔案格式', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
 ('38', 'attachment_management', 'fileType', null, 'image', 'image', '圖片', '圖片檔案', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
 ('39', 'attachment_management', 'fileType', null, 'document', 'document', '文件', '文件檔案', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 
 ('40', 'attachment_management', 'fileType', null, 'drawing', 'drawing', '圖面', '工程圖面', '2025-12-17 02:11:35.66813+00', '2025-12-17 02:11:35.66813+00'), 

@@ -1,6 +1,14 @@
 <template>
   <div class="material-system">
     <v-container fluid>
+      <!-- 載入中提示 -->
+      <v-progress-linear
+        v-if="permissionsLoading"
+        indeterminate
+        color="primary"
+        class="mb-4"
+      />
+
       <!-- 物料申請 -->
       <v-window v-model="tab">
         <v-window-item
@@ -97,6 +105,7 @@
 
   // 權限檢查
   const {
+    loadUserPagePermissions,
     canApply,
     canPackaging,
     canReview,
@@ -106,10 +115,13 @@
     canUsers,
     canApprovalWorkflow,
     canForms,
+    loading: permissionsLoading,
   } = usePermissions()
 
   // 根據權限設定預設 tab 和快捷鍵支援
-  onMounted(() => {
+  onMounted(async () => {
+    // 先載入權限
+    await loadUserPagePermissions()
     // 監聽路由查詢參數，切換 tab
     watch(() => route.query.tab, newTab => {
       if (newTab) {

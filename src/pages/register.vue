@@ -63,11 +63,13 @@ meta:
                   autocomplete="new-password"
                 />
 
-                <v-text-field
+                <v-select
                   v-model="form.department"
+                  :items="departmentOptions"
                   class="mb-4"
                   label="部門"
                   prepend-inner-icon="mdi-office-building"
+                  clearable
                   variant="outlined"
                 />
 
@@ -134,6 +136,7 @@ meta:
   import { computed, onMounted, reactive, ref } from 'vue'
   import { useRouter } from 'vue-router'
   import { useAuthStore } from '@/stores/auth'
+  import { departmentsService } from '@/api/services'
 
   const router = useRouter()
   const authStore = useAuthStore()
@@ -143,6 +146,8 @@ meta:
   const loading = computed(() => authStore.loading)
   const errorMessage = ref('')
   const successMessage = ref('')
+  const departments = ref([])
+  const loadingDepartments = ref(false)
 
   const form = reactive({
     email: '',
@@ -151,6 +156,15 @@ meta:
     confirmPassword: '',
     department: '',
     phone: '',
+  })
+
+  const departmentOptions = computed(() => {
+    return departments.value
+      .filter(d => d.is_active)
+      .map(d => ({
+        title: d.department_name,
+        value: d.department_code,
+      }))
   })
 
   const rules = {
@@ -253,7 +267,23 @@ meta:
     }, 200)
   }
 
-  onMounted(() => {
+  async function loadDepartments () {
+    loadingDepartments.value = true
+    try {
+      const data = await departmentsService.getDepartments({ is_active: true })
+      departments.value = data || []
+    } catch (error) {
+      console.error('載入部門列表失敗', error)
+      // 不顯示錯誤，因為部門選項不是必須的
+    } finally {
+      loadingDepartments.value = false
+    }
+  }
+
+  onMounted(async () => {
+    // 載入部門列表
+    await loadDepartments()
+
     styleRequiredAsterisks()
     // 當表單驗證狀態改變時，重新處理星號樣式
     const formElement = formRef.value?.$el

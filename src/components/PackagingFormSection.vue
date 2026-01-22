@@ -1,3 +1,22 @@
+<!--
+  PackagingFormSection.vue
+  
+  注意：此組件目前未在專案中使用。
+  系統已改為使用 DynamicFormRenderer 動態渲染表單欄位。
+  
+  此組件保留作為：
+  1. 包裝表單的參考實現
+  2. 未來可能需要單獨使用包裝表單的場景
+  
+  如需使用，請在組件中導入：
+  import PackagingFormSection from '@/components/PackagingFormSection.vue'
+  
+  組件功能：
+  - 組合 8 個 PackagingSection 組件，形成完整的包裝說明表單
+  - 包含：個別產品包裝、配件內容、配件、內盒、外箱、運輸與托盤要求、裝櫃要求、其他說明
+  - 使用 packagingStore 載入包裝選項
+-->
+
 <template>
   <div class="form-section">
     <h3>包裝說明</h3>

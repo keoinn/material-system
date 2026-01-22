@@ -7,17 +7,18 @@
     <v-card-text class="pt-6">
       <v-alert class="mb-4" type="info" variant="tonal">
         <strong>注意：</strong>
-        系統將根據選擇的物料大類產生對應的EXCEL格式。每個大類都有專屬的欄位配置。
+        系統將根據動態表單欄位定義產生對應的EXCEL格式。每個表單都有專屬的欄位配置。
       </v-alert>
 
       <v-form ref="formRef">
         <v-row>
           <v-col cols="12" md="3">
             <v-select
-              v-model="filters.category"
-              :items="categoryOptions"
-              label="物料大類"
+              v-model="filters.formId"
+              :items="formOptions"
+              label="表單"
               variant="outlined"
+              @update:model-value="onFormChange"
             />
           </v-col>
           <v-col cols="12" md="3">
@@ -93,13 +94,12 @@
 </template>
 
 <script setup>
-  import { onMounted, reactive, ref } from 'vue'
+  import { computed, onMounted, reactive, ref } from 'vue'
   import { useSwal } from '@/composables/useSwal'
-  import { applicationsService } from '@/api/services/applications'
+  import { approvalWorkflowsService } from '@/api/services/approvalWorkflows'
+  import { formDataService } from '@/api/services/formData'
+  import { formsService } from '@/api/services/forms'
   import { exportLogsService } from '@/api/services/exportLogs'
-  import { isSupabaseAvailable, supabase } from '@/api/supabase'
-  import { packagingService } from '@/api/services/packaging'
-  import { categoriesService } from '@/api/services/categories'
 
   const swal = useSwal()
 
@@ -107,309 +107,306 @@
   const exporting = ref(false)
   const previewData = ref([])
   const loadingPreview = ref(false)
+  const loadingForms = ref(false)
+  const forms = ref([])
+  const formFields = ref([]) // 當前選中表單的欄位定義
+  const approvalStatuses = ref([]) // 審核狀態列表
 
   const filters = reactive({
-    category: 'ALL',
+    formId: null,
     startDate: '',
     endDate: '',
-    status: 'ALL',
+    status: '',
   })
 
-  const categoryOptions = [
-    { title: '全部', value: 'ALL' },
-    { title: 'H - Handle (把手)', value: 'H' },
-    { title: 'S - Slide (滑軌)', value: 'S' },
-    { title: 'M - Module/Assy (模組)', value: 'M' },
-    { title: 'D - Decorative Hardware (裝飾五金)', value: 'D' },
-    { title: 'F - Functional Hardware (功能五金)', value: 'F' },
-    { title: 'B - Builders Hardware (建築五金)', value: 'B' },
-    { title: 'I - Industrial Parts Solution (工業零件)', value: 'I' },
-    { title: 'O - Others (其他)', value: 'O' },
-  ]
+  const formOptions = computed(() => {
+    return forms.value.map(form => ({
+      title: form.form_name,
+      value: form.id,
+    }))
+  })
 
-  const statusOptions = [
-    { title: '全部', value: 'ALL' },
-    { title: '已核准', value: 'APPROVED' },
-    { title: '待審核', value: 'PENDING' },
-    { title: '已退回', value: 'REJECTED' },
-  ]
+  // 從審核流程讀取狀態選項
+  const statusOptions = computed(() => {
+    const options = [{ title: '全部', value: '' }]
+    const statuses = approvalStatuses.value
+      .filter(s => s.is_active)
+      .sort((a, b) => a.display_order - b.display_order)
+      .map(s => ({
+        title: s.status_name,
+        value: s.status_code,
+      }))
+    return [...options, ...statuses]
+  })
 
-  const previewHeaders = [
-    { title: '料號', key: 'itemCode' },
-    { title: '料件說明', key: 'itemNameCN' },
-    { title: '客戶說明', key: 'itemNameEN' },
-    { title: '產品大類', key: 'mainCategory' },
-    { title: '狀態', key: 'status' },
-  ]
+  const previewHeaders = computed(() => {
+    // 動態生成預覽標題（只顯示前幾個重要欄位）
+    const headers = [
+      { title: '記錄ID', key: 'record_id', sortable: true },
+      { title: '狀態', key: 'status', sortable: true },
+    ]
+
+    // 添加表單欄位的前幾個作為預覽
+    if (formFields.value.length > 0) {
+      const previewFieldCount = Math.min(5, formFields.value.length)
+      for (let i = 0; i < previewFieldCount; i++) {
+        const field = formFields.value[i]
+        headers.push({
+          title: field.field_label,
+          key: `field_${field.field_key}`,
+          sortable: false,
+        })
+      }
+    }
+
+    return headers
+  })
 
   /**
-   * 獲取完整的申請資料（包含包裝和分類資訊）
+   * 載入表單列表
    */
-  async function fetchApplicationsForExport () {
-    if (!isSupabaseAvailable()) {
-      throw new Error('Supabase 客戶端未初始化')
-    }
-
-    // 構建查詢條件（只包含有值的條件）
-    const queryFilters = {}
-
-    // 狀態篩選
-    if (filters.status && filters.status !== 'ALL') {
-      queryFilters.status = filters.status
-    }
-
-    // 日期篩選（確保日期格式正確）
-    // 注意：Supabase 的日期查詢使用 submit_date 欄位，類型為 TIMESTAMP WITH TIME ZONE
-    if (filters.startDate) {
-      // 確保日期格式為 YYYY-MM-DD
-      // 直接使用日期字符串，Supabase 會自動處理時區
-      queryFilters.dateFrom = filters.startDate
-    }
-
-    if (filters.endDate) {
-      // 確保日期格式為 YYYY-MM-DD
-      // 直接使用日期字符串，Supabase 會自動處理時區
-      queryFilters.dateTo = filters.endDate
-    }
-
-    // 如果選擇了特定類別，需要先查找類別 ID
-    if (filters.category && filters.category !== 'ALL') {
-      try {
-        const mainCategories = await categoriesService.getMainCategories()
-        const mainCategory = mainCategories.find(cat => cat.code === filters.category)
-        if (mainCategory) {
-          queryFilters.mainCategory = mainCategory.id
-        } else {
-          console.warn(`找不到類別代碼: ${filters.category}`)
-        }
-      } catch (error) {
-        console.error('獲取分類失敗', error)
-        // 不拋出錯誤，繼續查詢其他條件
-      }
-    }
-
-    console.log('查詢條件:', JSON.stringify(queryFilters, null, 2))
-
-    // 獲取申請列表
-    let applications = []
+  async function loadForms () {
+    loadingForms.value = true
     try {
-      applications = await applicationsService.getApplications(queryFilters) || []
-      console.log('查詢結果數量:', applications.length)
+      const data = await formsService.getForms({ is_active: true })
+      forms.value = data || []
       
-      if (applications.length === 0) {
-        console.warn('沒有找到符合條件的申請記錄')
-        console.log('查詢條件詳情:', {
-          status: filters.status,
-          category: filters.category,
-          startDate: filters.startDate,
-          endDate: filters.endDate,
-          queryFilters,
-        })
-        return []
+      // 如果有表單，預設選擇第一個
+      if (forms.value.length > 0 && !filters.formId) {
+        filters.formId = forms.value[0].id
+        await onFormChange()
       }
     } catch (error) {
-      console.error('查詢申請記錄時發生錯誤:', error)
-      throw error
+      console.error('載入表單列表失敗', error)
+      await swal.error('載入失敗', error.message || '無法取得表單列表')
+    } finally {
+      loadingForms.value = false
     }
-
-    // 收集所有需要查詢的分類 ID
-    const categoryIds = new Set()
-    for (const app of applications) {
-      if (app.main_category_id) categoryIds.add(app.main_category_id)
-      if (app.sub_category_id) categoryIds.add(app.sub_category_id)
-      if (app.spec_category_id) categoryIds.add(app.spec_category_id)
-    }
-
-    // 一次性獲取所有分類資訊
-    const categoryMap = new Map()
-    if (categoryIds.size > 0) {
-      const { data: categories } = await supabase
-        .from('product_categories')
-        .select('id, code')
-        .in('id', Array.from(categoryIds))
-
-      if (categories) {
-        for (const cat of categories) {
-          categoryMap.set(cat.id, cat.code)
-        }
-      }
-    }
-
-    // 收集所有申請 ID
-    const applicationIds = applications.map(app => app.id)
-
-    // 一次性獲取所有包裝資料
-    const packagingMap = new Map()
-    if (applicationIds.length > 0) {
-      const { data: allPackaging } = await supabase
-        .from('application_packaging')
-        .select(`
-          application_id,
-          packaging_categories (
-            code
-          ),
-          packaging_options (
-            name
-          ),
-          description
-        `)
-        .in('application_id', applicationIds)
-        .order('application_id', { ascending: true })
-        .order('packaging_category_id', { ascending: true })
-
-      if (allPackaging) {
-        for (const pkg of allPackaging) {
-          if (!packagingMap.has(pkg.application_id)) {
-            packagingMap.set(pkg.application_id, [])
-          }
-          packagingMap.get(pkg.application_id).push(pkg)
-        }
-      }
-    }
-
-    // 轉換資料格式
-    return applications.map((app) => {
-      const packagingData = packagingMap.get(app.id) || []
-      const packaging = transformPackagingData(packagingData)
-
-      return {
-        ...app,
-        itemCode: app.item_code,
-        itemNameCN: app.item_name_cn,
-        itemNameEN: app.item_name_en,
-        mainCategory: categoryMap.get(app.main_category_id) || null,
-        subCategory: categoryMap.get(app.sub_category_id) || null,
-        specCategory: categoryMap.get(app.spec_category_id) || null,
-        material: app.material,
-        dimensions: app.dimensions,
-        packaging,
-      }
-    })
   }
 
   /**
-   * 轉換包裝資料格式
+   * 當表單改變時，載入欄位定義
    */
-  function transformPackagingData (packagingData) {
-    const packaging = {
-      productPackaging: { description: '' },
-      accessoriesContent: { description: '' },
-      accessories: { description: '' },
-      innerBox: { description: '' },
-      outerBox: { description: '' },
-      transport: { description: '' },
-      container: { description: '' },
-      other: { description: '' },
+  async function onFormChange () {
+    if (!filters.formId) {
+      formFields.value = []
+      return
     }
 
-    // 包裝類別代碼映射
-    const categoryCodeMap = {
-      productPackaging: 'productPackaging',
-      accessoriesContent: 'accessoriesContent',
-      accessories: 'accessories',
-      innerBox: 'innerBox',
-      outerBox: 'outerBox',
-      transport: 'transport',
-      container: 'container',
-      other: 'other',
+    try {
+      const form = await formsService.getForm(filters.formId, true)
+      if (form && form.fields) {
+        // 過濾掉聚合欄位（通常不需要匯出，因為它們是計算得出的）
+        formFields.value = form.fields
+          .filter(f => f.field_type !== 'aggregated')
+          .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+      } else {
+        formFields.value = []
+      }
+    } catch (error) {
+      console.error('載入表單欄位定義失敗', error)
+      formFields.value = []
+    }
+  }
+
+  /**
+   * 格式化欄位值為字串（用於 Excel 匯出）
+   */
+  function formatFieldValue (value, field) {
+    if (value === null || value === undefined || value === '') {
+      return ''
     }
 
-    // 按類別分組
-    const groupedByCategory = {}
-    for (const item of packagingData || []) {
-      const categoryCode = item.packaging_categories?.code
-      if (!categoryCode) continue
+    switch (field.field_type) {
+      case 'number':
+        return value.toString()
 
-      if (!groupedByCategory[categoryCode]) {
-        groupedByCategory[categoryCode] = []
-      }
+      case 'date':
+        if (value instanceof Date) {
+          return value.toISOString().split('T')[0]
+        }
+        if (typeof value === 'string') {
+          return value.split('T')[0] // 移除時間部分
+        }
+        return String(value)
 
-      const optionName = item.packaging_options?.name || ''
-      const description = item.description || ''
+      case 'datetime':
+        if (value instanceof Date) {
+          return value.toISOString()
+        }
+        return String(value)
 
-      if (optionName) {
-        groupedByCategory[categoryCode].push(optionName)
-      }
-      if (description && description.trim()) {
-        groupedByCategory[categoryCode].push(description.trim())
-      }
+      case 'checkbox':
+      case 'multiselect':
+        if (Array.isArray(value)) {
+          return value.join('; ')
+        }
+        return String(value)
+
+      case 'cascading_select':
+        if (Array.isArray(value)) {
+          return value.filter(v => v !== null && v !== undefined).join(' - ')
+        }
+        return String(value)
+
+      case 'json':
+        if (typeof value === 'object') {
+          return JSON.stringify(value)
+        }
+        return String(value)
+
+      case 'file':
+        return String(value)
+
+      default:
+        return String(value)
+    }
+  }
+
+  /**
+   * 獲取完整的申請資料（從動態表單讀取）
+   */
+  async function fetchApplicationsForExport () {
+    if (!filters.formId) {
+      throw new Error('請選擇表單')
     }
 
-    // 構建描述文字
-    for (const [code, items] of Object.entries(groupedByCategory)) {
-      const categoryKey = Object.keys(categoryCodeMap).find(
-        key => categoryCodeMap[key] === code,
-      )
-      if (categoryKey && packaging[categoryKey]) {
-        // 去重並合併
-        const uniqueItems = [...new Set(items)]
-        packaging[categoryKey].description = uniqueItems.join('; ')
-      }
+    // 構建審核記錄的篩選條件
+    const approvalFilters = {}
+
+    // 狀態篩選
+    if (filters.status && filters.status !== '') {
+      approvalFilters.status_code = filters.status
     }
 
-    return packaging
+    // 日期篩選
+    if (filters.startDate) {
+      approvalFilters.dateFrom = filters.startDate
+    }
+
+    if (filters.endDate) {
+      approvalFilters.dateTo = filters.endDate
+    }
+
+    // 獲取所有審核記錄
+    const approvalRecords = await approvalWorkflowsService.getAllApprovalApplications(approvalFilters)
+
+    // 過濾出當前表單的記錄
+    const formRecords = approvalRecords.filter(record => record.form_id === filters.formId)
+
+    if (formRecords.length === 0) {
+      return []
+    }
+
+    // 為每個記錄獲取表單資料
+    const applications = await Promise.all(
+      formRecords.map(async (record) => {
+        try {
+          // 從 form_data_values 獲取表單資料
+          const formData = await formDataService.getFormData(
+            filters.formId,
+            record.record_id,
+            { includeFieldDefinitions: true }
+          )
+
+          const values = formData?.values || {}
+          const fields = formData?.fields || []
+
+          // 構建應用記錄物件
+          const app = {
+            record_id: record.record_id,
+            status: record.current_status_code,
+            status_name: record.current_status_name,
+            applicant_name: record.applicant_username || 'Unknown',
+            submit_date: record.submit_date,
+            approval_date: record.approval_date,
+            reject_date: record.reject_date,
+            reject_reason: record.reject_reason,
+            // 添加所有欄位值
+            ...values,
+            // 保存欄位定義以便後續使用
+            _fields: fields,
+          }
+
+          return app
+        } catch (error) {
+          console.error(`載入申請 ${record.record_id} 的表單資料失敗`, error)
+          return null
+        }
+      })
+    )
+
+    // 過濾掉 null 值
+    return applications.filter(app => app !== null)
   }
 
   async function exportToExcel () {
     exporting.value = true
 
     try {
-      // 從 Supabase 獲取資料
+      // 從動態表單獲取資料
       const data = await fetchApplicationsForExport()
 
       if (data.length === 0) {
-        // 提供更詳細的錯誤信息
         let message = '沒有符合條件的資料。\n\n'
         message += '請檢查：\n'
         message += '1. 日期範圍是否正確\n'
         message += '2. 狀態篩選是否合適\n'
-        message += '3. 物料大類是否正確\n'
+        message += '3. 表單是否正確\n'
         message += '4. 資料庫中是否有申請記錄'
-        
+
         await swal.warning('沒有符合條件的資料', message)
         return
       }
 
-      // 產生CSV格式
-      let csv = '料號,料件說明,客戶說明,產品大類,產品中類,產品小類,料件基本材質,料件外型長,料件外型寬,料件外型高,料件外型重量,個別產品包裝,配件內容,配件,內盒,外箱,運輸與托盤要求,裝櫃要求,其他\n'
+      // 動態生成 CSV 標題行
+      const headers = ['記錄ID', '狀態', '申請人', '提交日期', '核准日期', '退回日期', '退回原因']
+      
+      // 添加表單欄位標題
+      for (const field of formFields.value) {
+        headers.push(field.field_label)
+      }
+
+      // 產生 CSV 內容
+      let csv = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n'
 
       for (const app of data) {
-        csv += `${app.itemCode || ''},`
-        csv += `"${(app.itemNameCN || '').replace(/"/g, '""')}",`
-        csv += `"${(app.itemNameEN || '').replace(/"/g, '""')}",`
-        csv += `${app.mainCategory || ''},`
-        csv += `${app.subCategory || ''},`
-        csv += `${app.specCategory || ''},`
-        csv += `${app.material || ''},`
-        csv += `${app.dimensions?.length || ''},`
-        csv += `${app.dimensions?.width || ''},`
-        csv += `${app.dimensions?.height || ''},`
-        csv += `${app.dimensions?.weight || ''},`
-        csv += `"${(app.packaging?.productPackaging?.description || '').replace(/"/g, '""')}",`
-        csv += `"${(app.packaging?.accessoriesContent?.description || '').replace(/"/g, '""')}",`
-        csv += `"${(app.packaging?.accessories?.description || '').replace(/"/g, '""')}",`
-        csv += `"${(app.packaging?.innerBox?.description || '').replace(/"/g, '""')}",`
-        csv += `"${(app.packaging?.outerBox?.description || '').replace(/"/g, '""')}",`
-        csv += `"${(app.packaging?.transport?.description || '').replace(/"/g, '""')}",`
-        csv += `"${(app.packaging?.container?.description || '').replace(/"/g, '""')}",`
-        csv += `"${(app.packaging?.other?.description || '').replace(/"/g, '""')}"\n`
+        const row = [
+          app.record_id || '',
+          app.status_name || app.status || '',
+          app.applicant_name || '',
+          app.submit_date ? new Date(app.submit_date).toISOString().split('T')[0] : '',
+          app.approval_date ? new Date(app.approval_date).toISOString().split('T')[0] : '',
+          app.reject_date ? new Date(app.reject_date).toISOString().split('T')[0] : '',
+          (app.reject_reason || '').replace(/"/g, '""'),
+        ]
+
+        // 添加表單欄位值
+        for (const field of formFields.value) {
+          const value = app[field.field_key]
+          const formattedValue = formatFieldValue(value, field)
+          row.push(formattedValue.replace(/"/g, '""'))
+        }
+
+        csv += row.map(cell => `"${cell}"`).join(',') + '\n'
       }
 
       // 下載檔案
       const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      const category = filters.category === 'ALL' ? 'ALL' : filters.category
+      const form = forms.value.find(f => f.id === filters.formId)
+      const formCode = form?.form_code || 'unknown'
       const date = new Date().toISOString().split('T')[0]
-      const fileName = `SAP_Material_Export_${category}_${date}.csv`
+      const fileName = `Export_${formCode}_${date}.csv`
       link.download = fileName
       link.click()
 
       // 記錄匯出日誌
       try {
         await exportLogsService.createExportLog({
-          category: filters.category !== 'ALL' ? filters.category : null,
-          status: filters.status !== 'ALL' ? filters.status : null,
+          category: formCode,
+          status: filters.status || null,
           startDate: filters.startDate || null,
           endDate: filters.endDate || null,
           recordCount: data.length,
@@ -431,35 +428,61 @@
     }
   }
 
+  // 從審核流程狀態定義獲取顏色
   function getStatusColor (status) {
-    const colors = {
-      PENDING: 'warning',
-      APPROVED: 'success',
-      REJECTED: 'error',
-    }
-    return colors[status] || 'grey'
+    if (!status) return 'grey'
+    const statusDef = approvalStatuses.value.find(s => s.status_code === status)
+    return statusDef?.color || 'grey'
   }
 
+  // 從審核流程狀態定義獲取文字
   function getStatusText (status) {
-    const texts = {
-      PENDING: '待審核',
-      APPROVED: '已核准',
-      REJECTED: '已退回',
+    if (!status) return '未知狀態'
+    const statusDef = approvalStatuses.value.find(s => s.status_code === status)
+    return statusDef?.status_name || status
+  }
+
+  // 載入審核狀態定義
+  async function loadApprovalStatuses () {
+    try {
+      approvalStatuses.value = await approvalWorkflowsService.getApprovalStatuses({ is_active: true })
+    } catch (error) {
+      console.error('載入審核狀態失敗', error)
+      // 如果載入失敗，使用預設狀態（向後兼容）
+      approvalStatuses.value = [
+        { status_code: 'DRAFT', status_name: '草稿', color: 'grey', is_active: true, display_order: 1 },
+        { status_code: 'PENDING', status_name: '待審核', color: 'warning', is_active: true, display_order: 2 },
+        { status_code: 'IN_REVIEW', status_name: '審核中', color: 'info', is_active: true, display_order: 3 },
+        { status_code: 'APPROVED', status_name: '已核准', color: 'success', is_active: true, display_order: 4 },
+        { status_code: 'REJECTED', status_name: '已退回', color: 'error', is_active: true, display_order: 5 },
+        { status_code: 'RETURNED', status_name: '退回修改', color: 'warning', is_active: true, display_order: 6 },
+      ]
     }
-    return texts[status] || status
   }
 
   async function previewExport () {
     loadingPreview.value = true
     try {
       const data = await fetchApplicationsForExport()
-      previewData.value = data.map(app => ({
-        itemCode: app.itemCode,
-        itemNameCN: app.itemNameCN,
-        itemNameEN: app.itemNameEN,
-        mainCategory: app.mainCategory,
-        status: app.status,
-      }))
+      
+      // 轉換為預覽格式
+      previewData.value = data.map(app => {
+        const previewItem = {
+          record_id: app.record_id,
+          status: app.status,
+        }
+
+        // 添加前幾個欄位作為預覽
+        if (formFields.value.length > 0) {
+          const previewFieldCount = Math.min(5, formFields.value.length)
+          for (let i = 0; i < previewFieldCount; i++) {
+            const field = formFields.value[i]
+            previewItem[`field_${field.field_key}`] = formatFieldValue(app[field.field_key], field)
+          }
+        }
+
+        return previewItem
+      })
     } catch (error) {
       console.error('預覽失敗', error)
       await swal.error('預覽失敗', error.message || '無法載入資料')
@@ -468,7 +491,7 @@
     }
   }
 
-  onMounted(() => {
+  onMounted(async () => {
     // 設定預設日期
     const today = new Date().toISOString().split('T')[0]
     filters.endDate = today
@@ -476,6 +499,12 @@
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
     filters.startDate = thirtyDaysAgo.toISOString().split('T')[0]
+
+    // 載入審核狀態和表單列表
+    await Promise.all([
+      loadApprovalStatuses(),
+      loadForms(),
+    ])
   })
 </script>
 

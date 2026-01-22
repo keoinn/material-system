@@ -255,8 +255,9 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { applicationsService } from '@/api/services/applications'
+import { approvalWorkflowsService } from '@/api/services/approvalWorkflows'
 import { formDataService } from '@/api/services/formData'
 import { useSwal } from '@/composables/useSwal'
 import DynamicFormRenderer from './DynamicFormRenderer.vue'
@@ -271,6 +272,7 @@ const loadingDetails = ref(false)
 const selectedApplicationId = ref(null)
 const selectedFormData = ref(null)
 const selectedFormId = ref(null)
+const approvalStatuses = ref([])
 
 const filters = reactive({
   itemCode: '',
@@ -279,15 +281,18 @@ const filters = reactive({
   dateFrom: '',
 })
 
-const statusOptions = [
-  { title: '全部', value: '' },
-  { title: '草稿', value: 'DRAFT' },
-  { title: '待審核', value: 'PENDING' },
-  { title: '審核中', value: 'IN_REVIEW' },
-  { title: '已核准', value: 'APPROVED' },
-  { title: '已退回', value: 'REJECTED' },
-  { title: '退回修改', value: 'RETURNED' },
-]
+// 從審核流程讀取狀態選項
+const statusOptions = computed(() => {
+  const options = [{ title: '全部', value: '' }]
+  const statuses = approvalStatuses.value
+    .filter(s => s.is_active)
+    .sort((a, b) => a.display_order - b.display_order)
+    .map(s => ({
+      title: s.status_name,
+      value: s.status_code,
+    }))
+  return [...options, ...statuses]
+})
 
 const headers = [
   { title: '申請日期', key: 'submit_date', sortable: true },
@@ -304,30 +309,36 @@ function formatDate (dateString) {
   return new Date(dateString).toLocaleDateString('zh-TW')
 }
 
+// 從審核流程狀態定義獲取顏色
 function getStatusColor (status) {
-  const statusMap = {
-    DRAFT: 'grey',
-    PENDING: 'warning',
-    IN_REVIEW: 'info',
-    APPROVED: 'success',
-    REJECTED: 'error',
-    RETURNED: 'warning',
-    SA_PENDING: 'warning',
-  }
-  return statusMap[status] || 'grey'
+  if (!status) return 'grey'
+  const statusDef = approvalStatuses.value.find(s => s.status_code === status)
+  return statusDef?.color || 'grey'
 }
 
+// 從審核流程狀態定義獲取文字
 function getStatusText (status) {
-  const statusMap = {
-    DRAFT: '草稿',
-    PENDING: '待審核',
-    IN_REVIEW: '審核中',
-    APPROVED: '已核准',
-    REJECTED: '已退回',
-    RETURNED: '退回修改',
-    SA_PENDING: '待審核',
+  if (!status) return '未知狀態'
+  const statusDef = approvalStatuses.value.find(s => s.status_code === status)
+  return statusDef?.status_name || status
+}
+
+// 載入審核狀態定義
+async function loadApprovalStatuses () {
+  try {
+    approvalStatuses.value = await approvalWorkflowsService.getApprovalStatuses({ is_active: true })
+  } catch (error) {
+    console.error('載入審核狀態失敗', error)
+    // 如果載入失敗，使用預設狀態（向後兼容）
+    approvalStatuses.value = [
+      { status_code: 'DRAFT', status_name: '草稿', color: 'grey', is_active: true, display_order: 1 },
+      { status_code: 'PENDING', status_name: '待審核', color: 'warning', is_active: true, display_order: 2 },
+      { status_code: 'IN_REVIEW', status_name: '審核中', color: 'info', is_active: true, display_order: 3 },
+      { status_code: 'APPROVED', status_name: '已核准', color: 'success', is_active: true, display_order: 4 },
+      { status_code: 'REJECTED', status_name: '已退回', color: 'error', is_active: true, display_order: 5 },
+      { status_code: 'RETURNED', status_name: '退回修改', color: 'warning', is_active: true, display_order: 6 },
+    ]
   }
-  return statusMap[status] || status
 }
 
 async function searchApplications () {
@@ -398,6 +409,11 @@ async function viewDetails (id) {
     selectedApplicationId.value = null
   }
 }
+
+// 組件掛載時載入審核狀態
+onMounted(() => {
+  loadApprovalStatuses()
+})
 </script>
 
 <style scoped lang="scss">
