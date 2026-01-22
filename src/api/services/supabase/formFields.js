@@ -48,6 +48,10 @@ export default {
       query = query.eq('is_visible', filters.is_visible)
     }
 
+    if (filters.is_in_template !== undefined) {
+      query = query.eq('is_in_template', filters.is_in_template)
+    }
+
     if (filters.field_type) {
       query = query.eq('field_type', filters.field_type)
     }

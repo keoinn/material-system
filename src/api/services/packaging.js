@@ -89,4 +89,25 @@ export const packagingService = {
   async deleteCategoryDefaults (mainCategoryCode) {
     return getImplementation().deleteCategoryDefaults(mainCategoryCode)
   },
+
+  /**
+   * 取得包裝說明模板
+   * @param {number|string} formId - 表單 ID 或 form_code
+   * @param {string} templateType - 模板類型（H, S, M, D, F, B, I, O）
+   * @returns {Promise<Object|null>}
+   */
+  async getPackagingTemplate (formId, templateType) {
+    return getImplementation().getPackagingTemplate(formId, templateType)
+  },
+
+  /**
+   * 儲存包裝說明模板
+   * @param {number|string} formId - 表單 ID 或 form_code
+   * @param {string} templateType - 模板類型（H, S, M, D, F, B, I, O）
+   * @param {Object} templateValues - 模板值（JSON 格式）
+   * @returns {Promise<Object>}
+   */
+  async savePackagingTemplate (formId, templateType, templateValues) {
+    return getImplementation().savePackagingTemplate(formId, templateType, templateValues)
+  },
 }

@@ -75,5 +75,23 @@ export default {
     const response = await apiClient.delete(`/packaging/defaults/${mainCategoryCode}`)
     return response.data || response
   },
+
+  /**
+   * 取得包裝說明模板
+   */
+  async getPackagingTemplate (formId, templateType) {
+    const response = await apiClient.get(`/packaging/templates/${formId}/${templateType}`)
+    return response.data || response
+  },
+
+  /**
+   * 儲存包裝說明模板
+   */
+  async savePackagingTemplate (formId, templateType, templateValues) {
+    const response = await apiClient.post(`/packaging/templates/${formId}/${templateType}`, {
+      template_values: templateValues,
+    })
+    return response.data || response
+  },
 }
 

@@ -813,6 +813,14 @@
                     label="唯讀"
                   />
                 </v-col>
+                <v-col cols="12" md="6">
+                  <v-switch
+                    v-model="fieldData.is_in_template"
+                    color="primary"
+                    hide-details
+                    label="加入模板"
+                  />
+                </v-col>
                 <v-col cols="12">
                   <v-text-field
                     v-model="fieldData.placeholder"
@@ -2164,6 +2172,7 @@
     validation_rules: {},
     is_visible: true,
     is_readonly: false,
+    is_in_template: false,
   })
 
   const fieldOptions = ref([])
@@ -2454,6 +2463,7 @@
         validation_rules: field.validation_rules || {},
         is_visible: field.is_visible !== false,
         is_readonly: field.is_readonly || false,
+        is_in_template: field.is_in_template || false,
       })
 
       // 載入選項
@@ -2549,6 +2559,7 @@
         validation_rules: {},
         is_visible: true,
         is_readonly: false,
+        is_in_template: false,
       })
       fieldOptions.value = []
       cascadingLevels.value = []
@@ -3492,6 +3503,7 @@
         is_required: fieldData.is_required || false,
         is_visible: fieldData.is_visible || false,
         is_readonly: fieldData.is_readonly || false,
+        is_in_template: fieldData.is_in_template || false,
         placeholder: fieldData.placeholder || '',
         help_text: fieldData.help_text || '',
         default_value: fieldData.default_value || '',
@@ -3615,6 +3627,9 @@
       }
       if (config.is_readonly !== undefined) {
         fieldData.is_readonly = config.is_readonly || false
+      }
+      if (config.is_in_template !== undefined) {
+        fieldData.is_in_template = config.is_in_template || false
       }
       if (config.placeholder !== undefined) {
         fieldData.placeholder = config.placeholder || ''
@@ -3820,6 +3835,9 @@
       }
       if (config.is_readonly !== undefined) {
         fieldData.is_readonly = config.is_readonly || false
+      }
+      if (config.is_in_template !== undefined) {
+        fieldData.is_in_template = config.is_in_template || false
       }
       if (config.placeholder !== undefined) {
         fieldData.placeholder = config.placeholder || ''
@@ -4426,6 +4444,7 @@
             validation_rules: field.validation_rules || {},
             is_visible: field.is_visible !== false,
             is_readonly: field.is_readonly || false,
+            is_in_template: field.is_in_template || false,
           }
 
           // 確定欄位 ID：優先使用欄位的 id，如果沒有則從 existingFields 中查找
@@ -4507,6 +4526,7 @@
             validation_rules: field.validation_rules || {},
             is_visible: field.is_visible !== false,
             is_readonly: field.is_readonly || false,
+            is_in_template: field.is_in_template || false,
           })
           // 更新本地欄位的 id
           field.id = createdField.id
@@ -4750,6 +4770,7 @@
     () => fieldData.is_required,
     () => fieldData.is_visible,
     () => fieldData.is_readonly,
+    () => fieldData.is_in_template,
     () => fieldData.placeholder,
     () => fieldData.help_text,
     () => fieldData.default_value,

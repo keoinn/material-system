@@ -4,17 +4,36 @@
       <v-card>
         <v-card-title class="system-header">
           <h2>使用者管理</h2>
-          <v-spacer />
-          <v-btn
-            color="primary"
-            prepend-icon="mdi-plus"
-            @click="openCreateDialog"
-          >
-            新增使用者
-          </v-btn>
         </v-card-title>
 
         <v-card-text class="pt-6">
+          <v-tabs v-model="activeTab" bg-color="grey-lighten-4">
+            <v-tab value="users">
+              <v-icon start>mdi-account-group</v-icon>
+              使用者
+            </v-tab>
+            <v-tab value="roles">
+              <v-icon start>mdi-shield-account</v-icon>
+              角色權限
+            </v-tab>
+            <v-tab value="departments">
+              <v-icon start>mdi-office-building</v-icon>
+              部門管理
+            </v-tab>
+          </v-tabs>
+
+          <v-window v-model="activeTab" class="mt-4">
+            <!-- 使用者管理 -->
+            <v-window-item value="users">
+              <div class="d-flex justify-end mb-4">
+                <v-btn
+                  color="primary"
+                  prepend-icon="mdi-plus"
+                  @click="openCreateDialog"
+                >
+                  新增使用者
+                </v-btn>
+              </div>
           <!-- 篩選條件 -->
           <v-row class="mb-4">
             <v-col cols="12" md="4">
@@ -87,6 +106,10 @@
               </v-chip>
             </template>
 
+            <template #item.department="{ item }">
+              {{ getDepartmentName(item.department) }}
+            </template>
+
             <template #item.is_active="{ item }">
               <v-chip
                 :color="item.is_active ? 'success' : 'error'"
@@ -129,6 +152,18 @@
               />
             </template>
           </v-data-table>
+            </v-window-item>
+
+            <!-- 角色權限管理 -->
+            <v-window-item value="roles">
+              <RolePermissionManagement />
+            </v-window-item>
+
+            <!-- 部門管理 -->
+            <v-window-item value="departments">
+              <DepartmentManagement />
+            </v-window-item>
+          </v-window>
         </v-card-text>
       </v-card>
 
@@ -204,9 +239,11 @@
                 variant="outlined"
               />
 
-              <v-text-field
+              <v-select
                 v-model="formData.department"
+                :items="departmentOptions"
                 label="部門"
+                clearable
                 variant="outlined"
               />
 
@@ -291,16 +328,21 @@
 </template>
 
 <script setup>
-  import { onMounted, reactive, ref } from 'vue'
-  import { usersService } from '@/api/services/users'
+  import { computed, onMounted, reactive, ref } from 'vue'
+  import { departmentsService, usersService } from '@/api/services'
   import { useSwal } from '@/composables/useSwal'
+  import DepartmentManagement from '@/components/DepartmentManagement.vue'
+  import RolePermissionManagement from '@/components/RolePermissionManagement.vue'
 
   const swal = useSwal()
 
+  const activeTab = ref('users')
   const loading = ref(false)
   const saving = ref(false)
   const deleting = ref(false)
+  const loadingDepartments = ref(false)
   const users = ref([])
+  const departments = ref([])
   const userDialog = ref(false)
   const deleteDialog = ref(false)
   const isEditMode = ref(false)
@@ -336,6 +378,15 @@
     { title: '啟用', value: true },
     { title: '停用', value: false },
   ]
+
+  const departmentOptions = computed(() => {
+    return departments.value
+      .filter(d => d.is_active)
+      .map(d => ({
+        title: d.department_name,
+        value: d.department_code,
+      }))
+  })
 
   const headers = [
     { title: 'Email', key: 'email', sortable: true },
@@ -381,6 +432,12 @@
     return texts[role] || role
   }
 
+  function getDepartmentName (departmentCode) {
+    if (!departmentCode) return '-'
+    const dept = departments.value.find(d => d.department_code === departmentCode)
+    return dept ? dept.department_name : departmentCode
+  }
+
   function formatDate (dateString) {
     if (!dateString) return ''
     return new Date(dateString).toLocaleString('zh-TW')
@@ -396,6 +453,19 @@
       await swal.error('載入失敗', error.message || '無法取得使用者列表')
     } finally {
       loading.value = false
+    }
+  }
+
+  async function loadDepartments () {
+    loadingDepartments.value = true
+    try {
+      const data = await departmentsService.getDepartments({ is_active: true })
+      departments.value = data || []
+    } catch (error) {
+      console.error('載入部門列表失敗', error)
+      // 不顯示錯誤，因為部門選項不是必須的
+    } finally {
+      loadingDepartments.value = false
     }
   }
 
@@ -532,6 +602,7 @@
 
   onMounted(() => {
     loadUsers()
+    loadDepartments()
   })
 </script>
 

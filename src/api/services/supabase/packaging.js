@@ -303,6 +303,134 @@ export default {
   },
 
   /**
+   * 取得包裝說明模板
+   * @param {number|string} formId - 表單 ID
+   * @param {string} templateType - 模板類型（H, S, M, D, F, B, I, O）
+   * @returns {Promise<Object|null>}
+   */
+  async getPackagingTemplate (formId, templateType) {
+    if (!isSupabaseAvailable()) {
+      throw new Error('Supabase 客戶端未初始化')
+    }
+
+    // 判斷是 ID 還是 form_code
+    const isNumeric = /^\d+$/.test(String(formId))
+    let actualFormId = formId
+
+    if (!isNumeric) {
+      // 如果是 form_code，先查詢表單 ID
+      const { data: form } = await supabase
+        .from('forms')
+        .select('id')
+        .eq('form_code', formId)
+        .single()
+
+      if (!form) {
+        throw new Error(`找不到表單: ${formId}`)
+      }
+
+      actualFormId = form.id
+    }
+
+    const { data, error } = await supabase
+      .from('packaging_templates')
+      .select('*')
+      .eq('form_id', actualFormId)
+      .eq('template_type', templateType)
+      .maybeSingle()
+
+    if (error) {
+      throw error
+    }
+
+    return data
+  },
+
+  /**
+   * 儲存包裝說明模板
+   * @param {number|string} formId - 表單 ID
+   * @param {string} templateType - 模板類型（H, S, M, D, F, B, I, O）
+   * @param {Object} templateValues - 模板值（JSON 格式）
+   * @returns {Promise<Object>}
+   */
+  async savePackagingTemplate (formId, templateType, templateValues) {
+    if (!isSupabaseAvailable()) {
+      throw new Error('Supabase 客戶端未初始化')
+    }
+
+    // 取得當前使用者 ID
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id || null
+
+    // 判斷是 ID 還是 form_code
+    const isNumeric = /^\d+$/.test(String(formId))
+    let actualFormId = formId
+
+    if (!isNumeric) {
+      // 如果是 form_code，先查詢表單 ID
+      const { data: form } = await supabase
+        .from('forms')
+        .select('id')
+        .eq('form_code', formId)
+        .single()
+
+      if (!form) {
+        throw new Error(`找不到表單: ${formId}`)
+      }
+
+      actualFormId = form.id
+    }
+
+    // 檢查是否已存在
+    const { data: existing } = await supabase
+      .from('packaging_templates')
+      .select('id')
+      .eq('form_id', actualFormId)
+      .eq('template_type', templateType)
+      .maybeSingle()
+
+    const templateData = {
+      form_id: actualFormId,
+      template_type: templateType,
+      template_values: templateValues,
+      updated_by_id: userId,
+      updated_at: new Date().toISOString(),
+    }
+
+    let data, error
+
+    if (existing) {
+      // 更新現有記錄
+      const { data: updated, error: updateError } = await supabase
+        .from('packaging_templates')
+        .update(templateData)
+        .eq('id', existing.id)
+        .select()
+        .single()
+
+      data = updated
+      error = updateError
+    } else {
+      // 建立新記錄
+      templateData.created_by_id = userId
+      const { data: created, error: createError } = await supabase
+        .from('packaging_templates')
+        .insert(templateData)
+        .select()
+        .single()
+
+      data = created
+      error = createError
+    }
+
+    if (error) {
+      throw error
+    }
+
+    return data
+  },
+
+  /**
    * 刪除類別預設包裝模板
    * @param {string} mainCategoryCode - 產品大類代碼
    * @returns {Promise<void>}
