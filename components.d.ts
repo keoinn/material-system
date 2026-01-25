@@ -26,6 +26,8 @@ declare module 'vue' {
     MaterialApplicationForm: typeof import('./src/components/MaterialApplicationForm.vue')['default']
     MultiselectField: typeof import('./src/components/form-fields/MultiselectField.vue')['default']
     NumberField: typeof import('./src/components/form-fields/NumberField.vue')['default']
+    OptionWorkbookEditor: typeof import('./src/components/OptionWorkbookEditor.vue')['default']
+    OptionWorkbooks: typeof import('./src/components/OptionWorkbooks.vue')['default']
     PackagingFormSection: typeof import('./src/components/PackagingFormSection.vue')['default']
     PackagingSection: typeof import('./src/components/PackagingSection.vue')['default']
     PackagingTemplateSettings: typeof import('./src/components/PackagingTemplateSettings.vue')['default']

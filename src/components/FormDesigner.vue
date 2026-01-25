@@ -599,6 +599,7 @@
                                 <component
                                   :is="getFieldComponent(field.field_type)"
                                   :field="field"
+                                  :loading="previewFieldLoading[field.field_key] || false"
                                   :model-value="previewValues[field.field_key]"
                                   :options="getFieldOptions(field)"
                                   :use-chip-style="field.field_type === 'checkbox'"
@@ -620,6 +621,7 @@
                             <component
                               :is="getFieldComponent(field.field_type)"
                               :field="field"
+                              :loading="previewFieldLoading[field.field_key] || false"
                               :model-value="previewValues[field.field_key]"
                               :options="getFieldOptions(field)"
                               :use-chip-style="field.field_type === 'checkbox'"
@@ -642,6 +644,7 @@
                         <component
                           :is="getFieldComponent(field.field_type)"
                           :field="field"
+                          :loading="previewFieldLoading[field.field_key] || false"
                           :model-value="previewValues[field.field_key]"
                           :options="getFieldOptions(field)"
                           @update:model-value="previewValues[field.field_key] = $event"
@@ -820,6 +823,32 @@
                     hide-details
                     label="加入模板"
                   />
+                </v-col>
+                <v-col
+                  v-if="isSelectOrMultiselect"
+                  cols="12"
+                >
+                  <div class="d-flex align-center" style="gap: 16px;">
+                    <v-switch
+                      v-model="useOptionWorkbook"
+                      color="primary"
+                      hide-details
+                      label="選項活頁簿"
+                      @update:model-value="handleOptionWorkbookToggle"
+                    />
+                    <v-select
+                      v-if="useOptionWorkbook"
+                      v-model="selectedWorkbookKey"
+                      :items="workbookOptions"
+                      :loading="loadingWorkbooks"
+                      label="選擇活頁簿"
+                      variant="outlined"
+                      item-title="label"
+                      item-value="value"
+                      style="flex: 1; max-width: 400px;"
+                      @update:model-value="handleWorkbookChange"
+                    />
+                  </div>
                 </v-col>
                 <v-col cols="12">
                   <v-text-field
@@ -2089,6 +2118,7 @@
   import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
   import { formFieldsService } from '@/api/services/formFields'
   import { formsService } from '@/api/services/forms'
+  import { optionWorkbooksService } from '@/api/services/optionWorkbooks'
   import { useSwal } from '@/composables/useSwal'
   import AggregatedField from './form-fields/AggregatedField.vue'
   import CascadingSelectField from './form-fields/CascadingSelectField.vue'
@@ -2130,6 +2160,8 @@
   const isAutoShowingFloatingWindow = ref(false) // 標記是否為自動顯示（避免與手動切換衝突）
   let scrollObserver = null // Intersection Observer 實例
   const previewValues = reactive({})
+  const previewFieldOptions = reactive({}) // 預覽時載入的欄位選項（用於選項活頁簿）
+  const previewFieldLoading = reactive({}) // 預覽時欄位載入狀態
 
   const isEditMode = computed(() => !!props.formId)
 
@@ -2351,6 +2383,17 @@
     return ['select', 'multiselect', 'checkbox', 'radio'].includes(fieldData.field_type)
   })
 
+  // 判斷是否為下拉式選單（select 或 multiselect）
+  const isSelectOrMultiselect = computed(() => {
+    return fieldData.field_type === 'select' || fieldData.field_type === 'multiselect'
+  })
+
+  // 選項活頁簿相關
+  const workbooks = ref([])
+  const loadingWorkbooks = ref(false)
+  const useOptionWorkbook = ref(false)
+  const selectedWorkbookKey = ref(null)
+
   const needsCascadingLevels = computed(() => {
     return fieldData.field_type === 'cascading_select'
   })
@@ -2466,6 +2509,19 @@
         is_in_template: field.is_in_template || false,
       })
 
+      // 載入選項活頁簿設定
+      if (isSelectOrMultiselect.value) {
+        useOptionWorkbook.value = !!(fieldConfig.option_workbook_key)
+        selectedWorkbookKey.value = fieldConfig.option_workbook_key || null
+        // 如果使用選項活頁簿，載入活頁簿列表
+        if (useOptionWorkbook.value) {
+          loadWorkbooks()
+        }
+      } else {
+        useOptionWorkbook.value = false
+        selectedWorkbookKey.value = null
+      }
+
       // 載入選項
       if (needsOptions.value && fieldData.field_config.options) {
         fieldOptions.value = Array.isArray(fieldData.field_config.options)
@@ -2565,6 +2621,8 @@
       cascadingLevels.value = []
       cascadingLevelCount.value = 1
       fieldConfigJson.value = '{}'
+      useOptionWorkbook.value = false
+      selectedWorkbookKey.value = null
     }
 
     // 如果是多層選單類型，初始化層級
@@ -3512,8 +3570,18 @@
         field_config: { ...fieldData.field_config },
       }
 
-      // 處理選項（如果需要的話）
-      if (needsOptions.value && fieldOptions.value.length > 0) {
+      // 處理選項活頁簿設定
+      if (isSelectOrMultiselect.value && useOptionWorkbook.value && selectedWorkbookKey.value) {
+        fullConfig.field_config.option_workbook_key = selectedWorkbookKey.value
+        // 如果使用選項活頁簿，清空手動設定的選項
+        delete fullConfig.field_config.options
+      } else {
+        // 如果不使用選項活頁簿，移除 option_workbook_key
+        delete fullConfig.field_config.option_workbook_key
+      }
+
+      // 處理選項（如果需要的話，且不使用選項活頁簿）
+      if (needsOptions.value && fieldOptions.value.length > 0 && !useOptionWorkbook.value) {
         fullConfig.field_config.options = fieldOptions.value
           .filter(opt => opt.value && opt.label)
           .map(opt => ({
@@ -3737,8 +3805,18 @@
     // 先從 JSON 更新 fieldData（如果用戶手動編輯了 JSON）
     updateFieldDataFromJson()
 
-    // 處理選項
-    if (needsOptions.value) {
+    // 處理選項活頁簿設定
+    if (isSelectOrMultiselect.value && useOptionWorkbook.value && selectedWorkbookKey.value) {
+      fieldData.field_config.option_workbook_key = selectedWorkbookKey.value
+      // 如果使用選項活頁簿，清空手動設定的選項
+      delete fieldData.field_config.options
+    } else {
+      // 如果不使用選項活頁簿，移除 option_workbook_key
+      delete fieldData.field_config.option_workbook_key
+    }
+
+    // 處理選項（如果需要的話，且不使用選項活頁簿）
+    if (needsOptions.value && !useOptionWorkbook.value) {
       fieldData.field_config.options = fieldOptions.value
         .filter(opt => opt.value && opt.label)
         .map(opt => ({
@@ -3898,6 +3976,57 @@
     fields.value.splice(index, 1)
     // 更新順序
     updateFieldOrders()
+  }
+
+  // 載入選項活頁簿列表（只載入啟用的活頁簿）
+  async function loadWorkbooks () {
+    if (loadingWorkbooks.value) return
+    loadingWorkbooks.value = true
+    try {
+      const data = await optionWorkbooksService.getWorkbooks({ is_active: true })
+      // 確保只保留啟用的活頁簿
+      workbooks.value = (data || []).filter(wb => wb.is_active === true)
+    } catch (error) {
+      console.error('載入選項活頁簿列表失敗', error)
+      await swal.error('載入失敗', '無法載入選項活頁簿列表')
+    } finally {
+      loadingWorkbooks.value = false
+    }
+  }
+
+  // 選項活頁簿選項列表（computed，只顯示啟用的活頁簿，只顯示活頁簿名稱）
+  const workbookOptions = computed(() => {
+    return workbooks.value
+      .filter(wb => wb.is_active === true) // 再次過濾，確保只顯示啟用的活頁簿
+      .map(wb => ({
+        value: wb.workbook_key,
+        label: wb.workbook_name, // 只顯示活頁簿名稱，不顯示 key 值
+      }))
+  })
+
+  // 處理選項活頁簿切換
+  async function handleOptionWorkbookToggle (value) {
+    if (value) {
+      // 開啟時載入活頁簿列表
+      if (workbooks.value.length === 0) {
+        await loadWorkbooks()
+      }
+      // 如果之前有選項，清空選項
+      if (fieldOptions.value.length > 0) {
+        fieldOptions.value = []
+      }
+    } else {
+      // 關閉時清空選中的活頁簿
+      selectedWorkbookKey.value = null
+    }
+  }
+
+  // 處理活頁簿選擇變更
+  function handleWorkbookChange (workbookKey) {
+    // 當選擇活頁簿時，清空手動設定的選項
+    if (workbookKey && fieldOptions.value.length > 0) {
+      fieldOptions.value = []
+    }
   }
 
   // 更新欄位順序
@@ -4679,9 +4808,16 @@
     return fieldComponents[fieldType] || TextField
   }
 
-  // 取得欄位選項
+  // 取得欄位選項（預覽用）
   function getFieldOptions (field) {
     const config = field.field_config || {}
+    
+    // 如果使用選項活頁簿，從已載入的選項中讀取
+    if (config.option_workbook_key) {
+      return previewFieldOptions[field.field_key] || []
+    }
+    
+    // 如果有 options，直接使用
     if (config.options && Array.isArray(config.options)) {
       return config.options.map(opt => {
         if (typeof opt === 'string') {
@@ -4692,6 +4828,50 @@
     }
     return []
   }
+
+  // 載入預覽欄位的選項活頁簿選項
+  async function loadPreviewWorkbookOptions (field) {
+    const config = field.field_config || {}
+    const workbookKey = config.option_workbook_key
+    
+    if (!workbookKey) {
+      return
+    }
+
+    // 如果已經載入過，直接返回
+    if (previewFieldOptions[field.field_key]) {
+      return
+    }
+
+    previewFieldLoading[field.field_key] = true
+    try {
+      const options = await optionWorkbooksService.getWorkbookOptions(workbookKey)
+      // 轉換為 SelectField 需要的格式（title 和 value）
+      previewFieldOptions[field.field_key] = options.map(opt => ({
+        value: opt.value,
+        label: opt.label,
+        title: opt.title || opt.label, // SelectField 使用 title
+      }))
+    } catch (error) {
+      console.error(`預覽：載入欄位 ${field.field_key} 選項活頁簿失敗`, error)
+      previewFieldOptions[field.field_key] = []
+    } finally {
+      previewFieldLoading[field.field_key] = false
+    }
+  }
+
+  // 監聽預覽欄位變化，載入選項活頁簿選項
+  watch(() => fields.value, async (newFields) => {
+    // 載入所有使用選項活頁簿的欄位選項
+    const loadPromises = newFields
+      .filter(field => {
+        const config = field.field_config || {}
+        return config.option_workbook_key && (field.field_type === 'select' || field.field_type === 'multiselect')
+      })
+      .map(field => loadPreviewWorkbookOptions(field))
+    
+    await Promise.all(loadPromises)
+  }, { immediate: true })
 
   // 取得欄位寬度
   function getFieldCols (field) {

@@ -9,7 +9,7 @@
         <v-icon
           size="64"
           color="grey"
-          class="mb-4"
+        class="mb-4"
         >
           mdi-tools
         </v-icon>

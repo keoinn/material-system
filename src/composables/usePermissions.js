@@ -19,6 +19,7 @@ const PAGE_CODES = {
   USERS: 'users',
   APPROVAL_WORKFLOW: 'approval-workflow',
   FORMS: 'forms',
+  OPTION_WORKBOOKS: 'option-workbooks',
 }
 
 /**
@@ -141,6 +142,11 @@ export function usePermissions () {
    */
   const canForms = computed(() => canAccessPage(PAGE_CODES.FORMS))
 
+  /**
+   * 檢查是否可以訪問選項活頁簿
+   */
+  const canOptionWorkbooks = computed(() => canAccessPage(PAGE_CODES.OPTION_WORKBOOKS))
+
   return {
     loadUserPagePermissions,
     canAccessPage,
@@ -156,6 +162,7 @@ export function usePermissions () {
     canUsers,
     canApprovalWorkflow,
     canForms,
+    canOptionWorkbooks,
     loading: computed(() => loading.value),
   }
 }

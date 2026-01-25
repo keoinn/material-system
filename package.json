@@ -11,12 +11,16 @@
   },
   "dependencies": {
     "@fontsource/roboto": "5.2.6",
+    "@handsontable/vue3": "^16.2.0",
     "@mdi/font": "7.4.47",
+    "@mescius/spread-sheets": "^19.0.2",
     "@supabase/supabase-js": "^2.87.1",
     "axios": "^1.13.2",
+    "handsontable": "^16.2.0",
     "pinia": "^3.0.3",
     "sweetalert2": "^11.26.10",
     "vue": "^3.5.17",
+    "vue3-excel-editor": "^1.0.60",
     "vuetify": "^3.9.1"
   },
   "devDependencies": {

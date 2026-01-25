@@ -176,6 +176,16 @@
           </template>
           <v-list-item-title>表單管理</v-list-item-title>
         </v-list-item>
+
+        <v-list-item
+          v-if="canOptionWorkbooks"
+          @click="navigateToTab('option-workbooks')"
+        >
+          <template #prepend>
+            <v-icon>mdi-book-open-variant</v-icon>
+          </template>
+          <v-list-item-title>選項活頁簿</v-list-item-title>
+        </v-list-item>
       </v-list>
     </v-navigation-drawer>
 
@@ -210,6 +220,7 @@
     canUsers,
     canApprovalWorkflow,
     canForms,
+    canOptionWorkbooks,
   } = usePermissions()
 
   const drawer = ref(false)

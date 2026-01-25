@@ -81,6 +81,14 @@
         >
           <FormsManagement />
         </v-window-item>
+
+        <!-- 選項活頁簿 -->
+        <v-window-item
+          v-if="canOptionWorkbooks"
+          value="option-workbooks"
+        >
+          <OptionWorkbooks />
+        </v-window-item>
       </v-window>
     </v-container>
   </div>
@@ -93,6 +101,7 @@
   import ApprovalWorkflowSettings from '@/components/ApprovalWorkflowSettings.vue'
   import ExcelExport from '@/components/ExcelExport.vue'
   import MaterialApplicationForm from '@/components/MaterialApplicationForm.vue'
+  import OptionWorkbooks from '@/components/OptionWorkbooks.vue'
   import PackagingTemplateSettings from '@/components/PackagingTemplateSettings.vue'
   import ReviewManagement from '@/components/ReviewManagement.vue'
   import SystemSettings from '@/components/SystemSettings.vue'
@@ -115,6 +124,7 @@
     canUsers,
     canApprovalWorkflow,
     canForms,
+    canOptionWorkbooks,
     loading: permissionsLoading,
   } = usePermissions()
 
@@ -136,6 +146,7 @@
           'users': canUsers.value,
           'approval-workflow': canApprovalWorkflow.value,
           'forms': canForms.value,
+          'option-workbooks': canOptionWorkbooks.value,
         }
 
         if (tabPermissions[newTab]) {
@@ -145,7 +156,7 @@
     }, { immediate: true })
 
     // 如果當前 tab 沒有權限，切換到第一個有權限的 tab
-    const tabOrder = ['apply', 'packaging', 'review', 'export', 'query', 'settings', 'users', 'approval-workflow', 'forms']
+    const tabOrder = ['apply', 'packaging', 'review', 'export', 'query', 'settings', 'users', 'approval-workflow', 'forms', 'option-workbooks']
     const tabPermissions = {
       'apply': canApply.value,
       'packaging': canPackaging.value,
@@ -156,6 +167,7 @@
       'users': canUsers.value,
       'approval-workflow': canApprovalWorkflow.value,
       'forms': canForms.value,
+      'option-workbooks': canOptionWorkbooks.value,
     }
 
     // 如果當前 tab 沒有權限，找到第一個有權限的 tab

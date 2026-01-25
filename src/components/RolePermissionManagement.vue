@@ -372,6 +372,7 @@
     { code: 'users', name: '使用者管理', description: '管理使用者帳號' },
     { code: 'approval-workflow', name: '審核流程設定', description: '設定審核流程' },
     { code: 'forms', name: '表單管理', description: '管理動態表單' },
+    { code: 'option-workbooks', name: '選項活頁簿', description: '管理選項活頁簿資料' },
   ]
 
   const rules = {

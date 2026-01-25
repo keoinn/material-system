@@ -210,6 +210,7 @@
   import { formDataService } from '@/api/services/formData'
   import { formFieldsService } from '@/api/services/formFields'
   import { formsService } from '@/api/services/forms'
+  import { optionWorkbooksService } from '@/api/services/optionWorkbooks'
   import AggregatedField from './form-fields/AggregatedField.vue'
   import CascadingSelectField from './form-fields/CascadingSelectField.vue'
   import CascadingSelectLevel from './form-fields/CascadingSelectLevel.vue'
@@ -504,13 +505,87 @@
     }
 
     try {
-      const data = await formDataService.getFormData(props.formId, props.recordId)
-      if (data && data.values) {
-        // 先將所有值賦值給 formValues
+      // 載入表單資料，包含欄位定義以便正確處理選項活頁簿
+      const data = await formDataService.getFormData(props.formId, props.recordId, {
+        includeFieldDefinitions: true,
+      })
+      
+      if (!data) {
+        console.warn('載入表單資料為空', { formId: props.formId, recordId: props.recordId })
+        return
+      }
+      
+      // 先將所有值賦值給 formValues（即使 values 為空也要處理）
+      if (data.values) {
         Object.assign(formValues, data.values)
+      } else {
+        console.warn('表單資料的 values 為空', { formId: props.formId, recordId: props.recordId, data })
+        // 即使 values 為空，也要清空 formValues
+        Object.keys(formValues).forEach(key => {
+          delete formValues[key]
+        })
+      }
+      
+      // 如果欄位定義已載入，更新欄位定義並重新載入選項活頁簿選項
+      if (data.fields && data.fields.length > 0) {
+        // 更新欄位定義（使用從資料庫載入的最新欄位定義）
+        fields.value = data.fields
+        
+        // 找到使用選項活頁簿的欄位
+        const fieldsWithWorkbook = data.fields.filter(field => {
+          const config = field.field_config || {}
+          return config.option_workbook_key && (field.field_type === 'select' || field.field_type === 'multiselect')
+        })
+        
+        // 重新載入使用選項活頁簿的欄位選項
+        if (fieldsWithWorkbook.length > 0) {
+          await Promise.all(fieldsWithWorkbook.map(async field => {
+            const config = field.field_config || {}
+            fieldLoading[field.field_key] = true
+            try {
+              const options = await loadWorkbookOptions(field, config)
+              fieldOptions[field.field_key] = options
+            } catch (error) {
+              console.error(`載入欄位 ${field.field_key} 選項活頁簿失敗`, error)
+              fieldOptions[field.field_key] = []
+            } finally {
+              fieldLoading[field.field_key] = false
+            }
+          }))
+        }
+      }
+      
+      // 如果欄位定義還沒有載入，使用現有的欄位定義重新載入選項活頁簿選項
+      else if (fields.value && fields.value.length > 0) {
+        const fieldsWithWorkbook = fields.value.filter(field => {
+          const config = field.field_config || {}
+          return config.option_workbook_key && (field.field_type === 'select' || field.field_type === 'multiselect')
+        })
+        
+        if (fieldsWithWorkbook.length > 0) {
+          await Promise.all(fieldsWithWorkbook.map(async field => {
+            const config = field.field_config || {}
+            // 如果選項還沒有載入，才載入
+            if (!fieldOptions[field.field_key]) {
+              fieldLoading[field.field_key] = true
+              try {
+                const options = await loadWorkbookOptions(field, config)
+                fieldOptions[field.field_key] = options
+              } catch (error) {
+                console.error(`載入欄位 ${field.field_key} 選項活頁簿失敗`, error)
+                fieldOptions[field.field_key] = []
+              } finally {
+                fieldLoading[field.field_key] = false
+              }
+            }
+          }))
+        }
+      }
 
         // 對於 cascading select 欄位，需要將各個層級的值組合成陣列
-        for (const field of fields.value) {
+      const currentFields = data.fields && data.fields.length > 0 ? data.fields : fields.value
+      if (currentFields && currentFields.length > 0) {
+        for (const field of currentFields) {
           if (field.field_type === 'cascading_select' && field.field_config?.levels) {
             const levels = field.field_config.levels
             const cascadingValues = []
@@ -637,6 +712,11 @@
   function getFieldOptions (field) {
     const config = field.field_config || {}
 
+    // 如果使用選項活頁簿，從已載入的選項中讀取
+    if (config.option_workbook_key) {
+      return fieldOptions[field.field_key] || []
+    }
+
     // 如果有 options，直接使用
     if (config.options && Array.isArray(config.options)) {
       return config.options.map(opt => {
@@ -660,8 +740,21 @@
     const loadPromises = fields.value.map(async field => {
       const config = field.field_config || {}
 
+      // 如果欄位使用選項活頁簿，需要動態載入選項
+      if (config.option_workbook_key) {
+        fieldLoading[field.field_key] = true
+        try {
+          const options = await loadWorkbookOptions(field, config)
+          fieldOptions[field.field_key] = options
+        } catch (error) {
+          console.error(`載入欄位 ${field.field_key} 選項活頁簿失敗`, error)
+          fieldOptions[field.field_key] = []
+        } finally {
+          fieldLoading[field.field_key] = false
+        }
+      }
       // 如果欄位有 source 配置，需要動態載入選項
-      if (config.source) {
+      else if (config.source) {
         fieldLoading[field.field_key] = true
         try {
           const options = await loadFieldOptions(field, config)
@@ -676,6 +769,30 @@
     })
 
     await Promise.all(loadPromises)
+  }
+
+  // 載入選項活頁簿的選項
+  async function loadWorkbookOptions (field, config) {
+    const workbookKey = config.option_workbook_key
+    if (!workbookKey) {
+      return []
+    }
+
+    try {
+      // 使用 optionWorkbooksService 取得活頁簿選項
+      // getWorkbookOptions 會自動使用 is_key 和 is_label 欄位
+      const options = await optionWorkbooksService.getWorkbookOptions(workbookKey)
+      
+      // 轉換為 SelectField 需要的格式（title 和 value）
+      return options.map(opt => ({
+        value: opt.value,
+        label: opt.label,
+        title: opt.title || opt.label, // SelectField 使用 title
+      }))
+    } catch (error) {
+      console.error(`載入選項活頁簿 ${workbookKey} 失敗`, error)
+      return []
+    }
   }
 
   // 載入欄位選項
@@ -870,14 +987,24 @@
   })
 
   // 監聽 formId 變化
-  watch(() => props.formId, () => {
-    loadForm()
+  watch(() => props.formId, async () => {
+    if (props.autoLoad) {
+      await loadForm()
+      // 如果已經有 recordId，載入表單資料
+      if (props.recordId) {
+        await loadFormData()
+      }
+    }
   }, { immediate: true })
 
   // 監聽 recordId 變化
-  watch(() => props.recordId, () => {
-    if (props.autoLoad) {
-      loadFormData()
+  watch(() => props.recordId, async () => {
+    if (props.autoLoad && props.recordId) {
+      // 確保表單定義已載入
+      if (!form.value || !fields.value.length) {
+        await loadForm()
+      }
+      await loadFormData()
     }
   }, { immediate: true })
 
@@ -888,11 +1015,11 @@
     }
   }, { deep: true })
 
-  onMounted(() => {
+  onMounted(async () => {
     if (props.autoLoad) {
-      loadForm()
+      await loadForm()
       if (props.recordId) {
-        loadFormData()
+        await loadFormData()
       }
     }
   })

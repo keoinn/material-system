@@ -100,6 +100,8 @@
   import { formDataService } from '@/api/services/formData'
   import { formsService } from '@/api/services/forms'
   import { exportLogsService } from '@/api/services/exportLogs'
+  import { optionWorkbooksService } from '@/api/services/optionWorkbooks'
+  import { suppliersService } from '@/api/services/suppliers'
 
   const swal = useSwal()
 
@@ -111,6 +113,8 @@
   const forms = ref([])
   const formFields = ref([]) // 當前選中表單的欄位定義
   const approvalStatuses = ref([]) // 審核狀態列表
+  const fieldOptionsCache = reactive({}) // 欄位選項快取（用於選項活頁簿）
+  const suppliersCache = reactive({}) // 供應商快取
 
   const filters = reactive({
     formId: null,
@@ -139,28 +143,11 @@
     return [...options, ...statuses]
   })
 
-  const previewHeaders = computed(() => {
-    // 動態生成預覽標題（只顯示前幾個重要欄位）
-    const headers = [
-      { title: '記錄ID', key: 'record_id', sortable: true },
-      { title: '狀態', key: 'status', sortable: true },
-    ]
-
-    // 添加表單欄位的前幾個作為預覽
-    if (formFields.value.length > 0) {
-      const previewFieldCount = Math.min(5, formFields.value.length)
-      for (let i = 0; i < previewFieldCount; i++) {
-        const field = formFields.value[i]
-        headers.push({
-          title: field.field_label,
-          key: `field_${field.field_key}`,
-          sortable: false,
-        })
-      }
-    }
-
-    return headers
-  })
+  const previewHeaders = ref([
+    { title: '單號', key: 'record_id', sortable: true },
+    { title: '料號', key: 'item_code', sortable: true },
+    { title: '狀態', key: 'status', sortable: true },
+  ])
 
   /**
    * 載入表單列表
@@ -210,11 +197,142 @@
   }
 
   /**
-   * 格式化欄位值為字串（用於 Excel 匯出）
+   * 取得 checkbox 欄位的所有選項
+   * @param {Object} field - 欄位定義
+   * @returns {Promise<Array>} 選項列表
    */
-  function formatFieldValue (value, field) {
+  async function getCheckboxFieldOptions (field) {
+    const config = field.field_config || {}
+    
+    // 如果使用選項活頁簿
+    if (config.option_workbook_key) {
+      const cacheKey = config.option_workbook_key
+      if (!fieldOptionsCache[cacheKey]) {
+        try {
+          const options = await optionWorkbooksService.getWorkbookOptions(config.option_workbook_key)
+          fieldOptionsCache[cacheKey] = options
+        } catch (error) {
+          console.error(`載入選項活頁簿 ${config.option_workbook_key} 失敗`, error)
+          fieldOptionsCache[cacheKey] = []
+        }
+      }
+      return fieldOptionsCache[cacheKey] || []
+    }
+    
+    // 如果有 options 配置
+    if (config.options && Array.isArray(config.options)) {
+      return config.options.map(opt => {
+        if (typeof opt === 'string') {
+          return { value: opt, label: opt, title: opt }
+        }
+        return {
+          value: opt.value || opt,
+          label: opt.label || opt.title || opt.value || opt,
+          title: opt.title || opt.label || opt.value || opt,
+        }
+      })
+    }
+    
+    return []
+  }
+
+  /**
+   * 格式化欄位值為字串（用於 Excel 匯出）
+   * @param {any} value - 欄位值
+   * @param {Object} field - 欄位定義
+   * @param {Object} app - 應用記錄（包含 _fields）
+   * @returns {Promise<string>|string} 格式化後的字串
+   */
+  async function formatFieldValue (value, field, app = null) {
     if (value === null || value === undefined || value === '') {
       return ''
+    }
+
+    const config = field.field_config || {}
+
+    // 處理 select 和 multiselect 欄位
+    if (field.field_type === 'select' || field.field_type === 'multiselect') {
+      // 如果使用選項活頁簿
+      if (config.option_workbook_key) {
+        const cacheKey = config.option_workbook_key
+        if (!fieldOptionsCache[cacheKey]) {
+          try {
+            const options = await optionWorkbooksService.getWorkbookOptions(config.option_workbook_key)
+            fieldOptionsCache[cacheKey] = options
+          } catch (error) {
+            console.error(`載入選項活頁簿 ${config.option_workbook_key} 失敗`, error)
+            fieldOptionsCache[cacheKey] = []
+          }
+        }
+        
+        const options = fieldOptionsCache[cacheKey] || []
+        if (Array.isArray(value)) {
+          // multiselect
+          return value.map(v => {
+            const option = options.find(opt => opt.value === v)
+            return option ? (option.label || option.title || v) : v
+          }).join('; ')
+        } else {
+          // select
+          const option = options.find(opt => opt.value === value)
+          return option ? (option.label || option.title || value) : value
+        }
+      }
+      
+      // 如果有 options 配置
+      if (config.options && Array.isArray(config.options)) {
+        if (Array.isArray(value)) {
+          // multiselect
+          return value.map(v => {
+            const option = config.options.find(opt => {
+              if (typeof opt === 'string') {
+                return opt === v
+              }
+              return (opt.value || opt) === v
+            })
+            if (option) {
+              if (typeof option === 'string') {
+                return option
+              }
+              return option.title || option.label || option.value || v
+            }
+            return v
+          }).join('; ')
+        } else {
+          // select
+          const option = config.options.find(opt => {
+            if (typeof opt === 'string') {
+              return opt === value
+            }
+            return (opt.value || opt) === value
+          })
+          if (option) {
+            if (typeof option === 'string') {
+              return option
+            }
+            return option.title || option.label || option.value || value
+          }
+        }
+      }
+      
+      // 如果是供應商欄位（根據欄位 key 判斷）
+      if (field.field_key && (field.field_key.toLowerCase().includes('supplier') || field.field_key.toLowerCase().includes('供應商'))) {
+        try {
+          // 嘗試從快取獲取
+          if (!suppliersCache[value]) {
+            const supplier = await suppliersService.getSupplier(value)
+            if (supplier) {
+              suppliersCache[value] = supplier.name || supplier.code || value
+            } else {
+              suppliersCache[value] = value
+            }
+          }
+          return suppliersCache[value]
+        } catch (error) {
+          console.warn(`獲取供應商 ${value} 名稱失敗`, error)
+          return value
+        }
+      }
     }
 
     switch (field.field_type) {
@@ -237,7 +355,6 @@
         return String(value)
 
       case 'checkbox':
-      case 'multiselect':
         if (Array.isArray(value)) {
           return value.join('; ')
         }
@@ -312,9 +429,32 @@
           const values = formData?.values || {}
           const fields = formData?.fields || []
 
+          // 查找欄位定義以確定正確的 field_key
+          // 料號對應到「系統編碼」欄位（system_code）
+          const systemCodeField = fields.find(f => f.field_key === 'system_code' || f.field_key === 'systemCode')
+          const itemCodeField = systemCodeField || fields.find(f => f.field_key === 'item_code' || f.field_key === 'itemCode')
+
+          let itemCode = values.system_code || values.systemCode || values.item_code || values.itemCode
+          // 如果是聚合欄位，嘗試重新計算
+          if (itemCodeField && itemCodeField.field_type === 'aggregated' && itemCodeField.field_config?.template) {
+            try {
+              itemCode = await formDataService._calculateAggregatedValue(
+                itemCodeField.field_config.template,
+                values,
+                itemCodeField.field_config.counterKey || itemCodeField.field_key,
+              )
+            } catch (error) {
+              console.warn('重新計算聚合料號失敗，使用原始值', error)
+            }
+          }
+          if (!itemCode || itemCode === '') {
+            itemCode = 'N/A'
+          }
+
           // 構建應用記錄物件
           const app = {
             record_id: record.record_id,
+            item_code: itemCode,
             status: record.current_status_code,
             status_name: record.current_status_name,
             applicant_name: record.applicant_username || 'Unknown',
@@ -360,11 +500,34 @@
       }
 
       // 動態生成 CSV 標題行
-      const headers = ['記錄ID', '狀態', '申請人', '提交日期', '核准日期', '退回日期', '退回原因']
+      const headers = ['單號', '狀態', '申請人', '提交日期', '核准日期', '退回日期', '退回原因']
+      
+      // 預先載入所有 checkbox 欄位的選項（用於展開列）
+      const checkboxFieldsMap = new Map() // Map<field_key, options[]>
+      for (const field of formFields.value) {
+        if (field.field_type === 'checkbox') {
+          const options = await getCheckboxFieldOptions(field)
+          checkboxFieldsMap.set(field.field_key, options)
+        }
+      }
       
       // 添加表單欄位標題
       for (const field of formFields.value) {
-        headers.push(field.field_label)
+        if (field.field_type === 'checkbox') {
+          // checkbox 欄位：每個選項變成一個列（不加上子群組名稱）
+          const options = checkboxFieldsMap.get(field.field_key) || []
+          for (const option of options) {
+            const optionLabel = typeof option === 'string' ? option : (option.label || option.title || option.value || '')
+            headers.push(`${field.field_label} - ${optionLabel}`)
+          }
+        } else {
+          // 其他欄位：如果有子群組，加上子群組名稱
+          if (field.sub_group) {
+            headers.push(`${field.sub_group} - ${field.field_label}`)
+          } else {
+            headers.push(field.field_label)
+          }
+        }
       }
 
       // 產生 CSV 內容
@@ -384,8 +547,22 @@
         // 添加表單欄位值
         for (const field of formFields.value) {
           const value = app[field.field_key]
-          const formattedValue = formatFieldValue(value, field)
-          row.push(formattedValue.replace(/"/g, '""'))
+          
+          if (field.field_type === 'checkbox') {
+            // checkbox 欄位：每個選項變成一個列，用 V 或空白表示
+            const options = checkboxFieldsMap.get(field.field_key) || []
+            const selectedValues = Array.isArray(value) ? value : (value ? [value] : [])
+            
+            for (const option of options) {
+              const optionValue = typeof option === 'string' ? option : (option.value || option)
+              const isSelected = selectedValues.includes(optionValue)
+              row.push(isSelected ? 'V' : '')
+            }
+          } else {
+            // 其他欄位：正常格式化
+            const formattedValue = await formatFieldValue(value, field, app)
+            row.push(String(formattedValue).replace(/"/g, '""'))
+          }
         }
 
         csv += row.map(cell => `"${cell}"`).join(',') + '\n'
@@ -465,10 +642,57 @@
     try {
       const data = await fetchApplicationsForExport()
       
-      // 轉換為預覽格式
-      previewData.value = data.map(app => {
+      // 動態生成預覽標題（只顯示前幾個重要欄位）
+      const headers = [
+        { title: '單號', key: 'record_id', sortable: true },
+        { title: '料號', key: 'item_code', sortable: true },
+        { title: '狀態', key: 'status', sortable: true },
+      ]
+      
+      // 預先載入所有 checkbox 欄位的選項（用於展開列）
+      const checkboxFieldsMap = new Map() // Map<field_key, options[]>
+      
+      // 添加表單欄位的前幾個作為預覽
+      if (formFields.value.length > 0) {
+        const previewFieldCount = Math.min(5, formFields.value.length)
+        for (let i = 0; i < previewFieldCount; i++) {
+          const field = formFields.value[i]
+          
+          if (field.field_type === 'checkbox') {
+            // checkbox 欄位：每個選項變成一個列（不加上子群組名稱）
+            const options = await getCheckboxFieldOptions(field)
+            checkboxFieldsMap.set(field.field_key, options)
+            
+            for (const option of options) {
+              const optionLabel = typeof option === 'string' ? option : (option.label || option.title || option.value || '')
+              const optionValue = typeof option === 'string' ? option : (option.value || option)
+              headers.push({
+                title: `${field.field_label} - ${optionLabel}`,
+                key: `field_${field.field_key}_${optionValue}`,
+                sortable: false,
+              })
+            }
+          } else {
+            // 其他欄位：如果有子群組，加上子群組名稱
+            const title = field.sub_group ? `${field.sub_group} - ${field.field_label}` : field.field_label
+            headers.push({
+              title,
+              key: `field_${field.field_key}`,
+              sortable: false,
+            })
+          }
+        }
+      }
+      
+      // 更新預覽標題
+      previewHeaders.value = headers
+      
+      // 轉換為預覽格式（需要處理 async formatFieldValue）
+      const previewItems = []
+      for (const app of data) {
         const previewItem = {
           record_id: app.record_id,
+          item_code: app.item_code || 'N/A',
           status: app.status,
         }
 
@@ -477,12 +701,29 @@
           const previewFieldCount = Math.min(5, formFields.value.length)
           for (let i = 0; i < previewFieldCount; i++) {
             const field = formFields.value[i]
-            previewItem[`field_${field.field_key}`] = formatFieldValue(app[field.field_key], field)
+            const value = app[field.field_key]
+            
+            if (field.field_type === 'checkbox') {
+              // checkbox 欄位：每個選項變成一個欄位
+              const options = checkboxFieldsMap.get(field.field_key) || []
+              const selectedValues = Array.isArray(value) ? value : (value ? [value] : [])
+              
+              for (const option of options) {
+                const optionValue = typeof option === 'string' ? option : (option.value || option)
+                const isSelected = selectedValues.includes(optionValue)
+                previewItem[`field_${field.field_key}_${optionValue}`] = isSelected ? 'V' : ''
+              }
+            } else {
+              // 其他欄位：正常格式化
+              previewItem[`field_${field.field_key}`] = await formatFieldValue(value, field, app)
+            }
           }
         }
 
-        return previewItem
-      })
+        previewItems.push(previewItem)
+      }
+      
+      previewData.value = previewItems
     } catch (error) {
       console.error('預覽失敗', error)
       await swal.error('預覽失敗', error.message || '無法載入資料')
