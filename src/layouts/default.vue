@@ -17,7 +17,10 @@
       </v-btn>
 
       <v-app-bar-title>
-        <div class="d-flex align-center">
+        <div
+          class="d-flex align-center cursor-pointer"
+          @click="navigateToHome"
+        >
           <v-icon class="mr-2">mdi-package-variant</v-icon>
           <span>物料編碼申請管理系統</span>
           <v-chip
@@ -76,6 +79,7 @@
         </v-list-item>
         <v-divider />
 
+        <!-- 1. 物料申請 -->
         <v-list-item
           v-if="canApply"
           @click="navigateToTab('apply')"
@@ -86,6 +90,40 @@
           <v-list-item-title>物料申請</v-list-item-title>
         </v-list-item>
 
+        <!-- 2. 申請查詢 -->
+        <v-list-item
+          v-if="canQuery"
+          @click="navigateToTab('query')"
+        >
+          <template #prepend>
+            <v-icon>mdi-magnify</v-icon>
+          </template>
+          <v-list-item-title>申請查詢</v-list-item-title>
+        </v-list-item>
+
+        <!-- 3. EXCEL匯出 -->
+        <v-list-item
+          v-if="canExport"
+          @click="navigateToTab('export')"
+        >
+          <template #prepend>
+            <v-icon>mdi-file-excel</v-icon>
+          </template>
+          <v-list-item-title>EXCEL匯出</v-list-item-title>
+        </v-list-item>
+
+        <!-- 4. 選項活頁簿 -->
+        <v-list-item
+          v-if="canOptionWorkbooks"
+          @click="navigateToTab('option-workbooks')"
+        >
+          <template #prepend>
+            <v-icon>mdi-book-open-variant</v-icon>
+          </template>
+          <v-list-item-title>選項活頁簿</v-list-item-title>
+        </v-list-item>
+
+        <!-- 5. 包裝說明設定 -->
         <v-list-item
           v-if="canPackaging"
           @click="navigateToTab('packaging')"
@@ -96,6 +134,7 @@
           <v-list-item-title>包裝說明設定</v-list-item-title>
         </v-list-item>
 
+        <!-- 6. 審核管理 -->
         <v-list-item
           v-if="canReview"
           @click="navigateToTab('review')"
@@ -117,56 +156,7 @@
           </v-list-item-title>
         </v-list-item>
 
-        <v-list-item
-          v-if="canExport"
-          @click="navigateToTab('export')"
-        >
-          <template #prepend>
-            <v-icon>mdi-file-excel</v-icon>
-          </template>
-          <v-list-item-title>EXCEL匯出</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item
-          v-if="canQuery"
-          @click="navigateToTab('query')"
-        >
-          <template #prepend>
-            <v-icon>mdi-magnify</v-icon>
-          </template>
-          <v-list-item-title>申請查詢</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item
-          v-if="canSettings"
-          @click="navigateToTab('settings')"
-        >
-          <template #prepend>
-            <v-icon>mdi-cog</v-icon>
-          </template>
-          <v-list-item-title>系統設定</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item
-          v-if="canUsers"
-          @click="navigateToTab('users')"
-        >
-          <template #prepend>
-            <v-icon>mdi-account-group</v-icon>
-          </template>
-          <v-list-item-title>使用者管理</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item
-          v-if="canApprovalWorkflow"
-          @click="navigateToTab('approval-workflow')"
-        >
-          <template #prepend>
-            <v-icon>mdi-sitemap</v-icon>
-          </template>
-          <v-list-item-title>審核流程設定</v-list-item-title>
-        </v-list-item>
-
+        <!-- 7. 表單管理 -->
         <v-list-item
           v-if="canForms"
           @click="navigateToTab('forms')"
@@ -177,14 +167,37 @@
           <v-list-item-title>表單管理</v-list-item-title>
         </v-list-item>
 
+        <!-- 8. 審核流程設定 -->
         <v-list-item
-          v-if="canOptionWorkbooks"
-          @click="navigateToTab('option-workbooks')"
+          v-if="canApprovalWorkflow"
+          @click="navigateToTab('approval-workflow')"
         >
           <template #prepend>
-            <v-icon>mdi-book-open-variant</v-icon>
+            <v-icon>mdi-sitemap</v-icon>
           </template>
-          <v-list-item-title>選項活頁簿</v-list-item-title>
+          <v-list-item-title>審核流程設定</v-list-item-title>
+        </v-list-item>
+
+        <!-- 9. 使用者管理 -->
+        <v-list-item
+          v-if="canUsers"
+          @click="navigateToTab('users')"
+        >
+          <template #prepend>
+            <v-icon>mdi-account-group</v-icon>
+          </template>
+          <v-list-item-title>使用者管理</v-list-item-title>
+        </v-list-item>
+
+        <!-- 10. 系統設定 -->
+        <v-list-item
+          v-if="canSettings"
+          @click="navigateToTab('settings')"
+        >
+          <template #prepend>
+            <v-icon>mdi-cog</v-icon>
+          </template>
+          <v-list-item-title>系統設定</v-list-item-title>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
@@ -267,8 +280,24 @@
   function navigateToTab (tab) {
     router.push({ path: '/', query: { tab } })
   }
+
+  /**
+   * 導航到首頁
+   */
+  function navigateToHome () {
+    router.push({ path: '/', query: {} })
+  }
 </script>
 
 <style scoped lang="scss">
 @import '@/styles/material-system.scss';
+
+.cursor-pointer {
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  
+  &:hover {
+    opacity: 0.8;
+  }
+}
 </style>

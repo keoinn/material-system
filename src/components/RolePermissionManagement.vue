@@ -171,21 +171,37 @@
                 </div>
 
                 <v-row>
-                  <v-col
-                    v-for="page in availablePages"
-                    :key="page.code"
-                    cols="12"
-                    md="6"
-                  >
-                    <v-switch
-                      v-model="selectedPageCodes"
-                      :value="page.code"
-                      :label="page.name"
-                      :hint="page.description"
-                      persistent-hint
-                      color="primary"
-                      hide-details="auto"
-                    />
+                  <!-- 左邊：單數頁面（1, 3, 5, 7, 9） -->
+                  <v-col cols="12" md="6">
+                    <div class="d-flex flex-column gap-2">
+                      <v-switch
+                        v-for="(page, index) in availablePages.filter((_, i) => i % 2 === 0)"
+                        :key="page.code"
+                        v-model="selectedPageCodes"
+                        :value="page.code"
+                        :label="page.name"
+                        :hint="page.description"
+                        persistent-hint
+                        color="primary"
+                        hide-details="auto"
+                      />
+                    </div>
+                  </v-col>
+                  <!-- 右邊：雙數頁面（2, 4, 6, 8, 10） -->
+                  <v-col cols="12" md="6">
+                    <div class="d-flex flex-column gap-2">
+                      <v-switch
+                        v-for="(page, index) in availablePages.filter((_, i) => i % 2 === 1)"
+                        :key="page.code"
+                        v-model="selectedPageCodes"
+                        :value="page.code"
+                        :label="page.name"
+                        :hint="page.description"
+                        persistent-hint
+                        color="primary"
+                        hide-details="auto"
+                      />
+                    </div>
                   </v-col>
                 </v-row>
               </div>
@@ -361,18 +377,18 @@
     { title: '操作', key: 'actions', sortable: false },
   ]
 
-  // 可用頁面列表（參考 src/pages/index.vue）
+  // 可用頁面列表（按照指定順序：單數左邊，雙數右邊）
   const availablePages = [
     { code: 'apply', name: '物料申請', description: '提交物料申請表單' },
+    { code: 'query', name: '申請查詢', description: '查詢申請記錄' },
+    { code: 'export', name: 'EXCEL匯出', description: '匯出申請資料為EXCEL' },
+    { code: 'option-workbooks', name: '選項活頁簿', description: '管理選項活頁簿資料' },
     { code: 'packaging', name: '包裝說明設定', description: '設定包裝說明模板' },
     { code: 'review', name: '審核管理', description: '審核待審核的申請' },
-    { code: 'export', name: 'EXCEL匯出', description: '匯出申請資料為EXCEL' },
-    { code: 'query', name: '申請查詢', description: '查詢申請記錄' },
-    { code: 'settings', name: '系統設定', description: '系統設定管理' },
-    { code: 'users', name: '使用者管理', description: '管理使用者帳號' },
-    { code: 'approval-workflow', name: '審核流程設定', description: '設定審核流程' },
     { code: 'forms', name: '表單管理', description: '管理動態表單' },
-    { code: 'option-workbooks', name: '選項活頁簿', description: '管理選項活頁簿資料' },
+    { code: 'approval-workflow', name: '審核流程設定', description: '設定審核流程' },
+    { code: 'users', name: '使用者管理', description: '管理使用者帳號' },
+    { code: 'settings', name: '系統設定', description: '系統設定管理' },
   ]
 
   const rules = {

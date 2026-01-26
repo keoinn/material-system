@@ -6,14 +6,20 @@
 
 ### 主要文件
 
-1. **[REFACTORING_PLAN.md](./REFACTORING_PLAN.md)** ⭐ **必讀**
+1. **[USER_MANUAL.md](./USER_MANUAL.md)** ⭐ **使用者必讀**
+   - 完整的使用說明書
+   - 各功能模組的詳細操作步驟
+   - 常見問題解答
+   - 快捷鍵說明
+
+2. **[REFACTORING_PLAN.md](./REFACTORING_PLAN.md)** ⭐ **開發者必讀**
    - 完整的重構計劃與步驟
    - 包含所有開發步驟的詳細 Prompt
    - 系統功能與特點分析
    - 技術架構分析
    - 參考檔案整理指南
 
-2. **[SYSTEM_FEATURES.md](./SYSTEM_FEATURES.md)** ⭐ **必讀**
+3. **[SYSTEM_FEATURES.md](./SYSTEM_FEATURES.md)** ⭐ **開發者必讀**
    - 系統功能與特點快速參考
    - 功能優先級矩陣
    - 開發建議
