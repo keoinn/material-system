@@ -5,11 +5,11 @@
 -- 並從 auth.users 同步現有用戶的 email
 
 -- 1. 添加 email 欄位
-ALTER TABLE user_profiles
+ALTER TABLE public.user_profiles
 ADD COLUMN IF NOT EXISTS email VARCHAR(255);
 
 -- 2. 創建索引
-CREATE INDEX IF NOT EXISTS idx_user_profiles_email ON user_profiles(email);
+CREATE INDEX IF NOT EXISTS idx_user_profiles_email ON public.user_profiles(email);
 
 -- 3. 更新現有記錄的 email（從 auth.users 同步）
 -- 注意：這需要管理員權限，因為需要訪問 auth.users 表
@@ -18,17 +18,17 @@ CREATE INDEX IF NOT EXISTS idx_user_profiles_email ON user_profiles(email);
 -- 方法 1：使用 Supabase Dashboard 的 SQL Editor（推薦）
 -- 執行以下 SQL（需要 service_role key）：
 /*
-UPDATE user_profiles up
+UPDATE public.user_profiles up
 SET email = au.email
 FROM auth.users au
 WHERE up.id = au.id AND up.email IS NULL;
 */
 
 -- 方法 2：創建一個函數來同步 email（需要 SECURITY DEFINER）
-CREATE OR REPLACE FUNCTION sync_user_profiles_email()
+CREATE OR REPLACE FUNCTION public.sync_user_profiles_email()
 RETURNS void AS $$
 BEGIN
-  UPDATE user_profiles up
+  UPDATE public.user_profiles up
   SET email = au.email
   FROM auth.users au
   WHERE up.id = au.id AND (up.email IS NULL OR up.email != au.email);
@@ -36,7 +36,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 執行同步函數（需要管理員權限）
--- SELECT sync_user_profiles_email();
+-- SELECT public.sync_user_profiles_email();
 
 -- 4. 更新 handle_new_user 函數以包含 email
 CREATE OR REPLACE FUNCTION public.handle_new_user()

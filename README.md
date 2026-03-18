@@ -11,10 +11,11 @@
 - **Pinia** - 狀態管理
 - **Vue Router** - 路由管理（使用 auto-route）
 - **SCSS** - 樣式預處理器
+- **Supabase** - Auth / Database（支援 Edge Functions）
 
 ## 專案結構
 
-```
+```text
 src/
 ├── components/          # Vue 組件
 │   ├── MaterialApplicationForm.vue    # 物料申請表單
@@ -50,33 +51,67 @@ src/
 ## 功能特色
 
 ### 1. 物料申請
+
 - 三層分類架構（大類/中類/小類）
 - 自動產生料號
 - 完整的包裝說明（8個類別）
 - 自動儲存草稿
 
 ### 2. 審核管理
+
 - 待審核申請列表
 - 核准/退回功能
 - 申請詳情查看
 
 ### 3. Excel匯出
+
 - 支援多條件篩選
 - CSV格式匯出
 - 資料預覽功能
 
 ### 4. 申請查詢
+
 - 多條件搜尋
 - 申請記錄查詢
 - 詳情查看
 
 ### 5. 系統設定
+
 - 編碼規則設定
 - 審核流程設定
 
 ### 6. 包裝模板管理
+
 - 類別預設值設定
 - 模板儲存與載入
+
+## 管理者變更其他使用者密碼（Supabase）
+
+在 `VITE_API_BACKEND=supabase` 模式下，前端無法使用 anon key 直接修改「其他使用者」的 Auth 密碼。本專案使用 Supabase Edge Function 來讓 **admin** 角色執行密碼重設。
+
+- **Edge Function**: `supabase/functions/admin-reset-password/index.ts`
+- **權限**: 只有 `user_profiles.role = 'admin'` 且帳號啟用者可呼叫
+- **需要設定的 Function Secrets**
+  - `SERVICE_ROLE_KEY`（Supabase CLI 不允許 `SUPABASE_` 前綴的自訂 secrets）
+
+部署方式（範例）請使用 Supabase CLI：
+
+```bash
+supabase functions deploy admin-reset-password
+supabase secrets set SERVICE_ROLE_KEY="<service_role_key>"
+```
+
+如果你在瀏覽器端呼叫時遇到 CORS preflight（`OPTIONS`）被擋，請確保此 function **沒有啟用 gateway JWT 驗證**（因為 preflight 不會帶 Authorization，會在到達程式碼前就被擋下）。本專案已提供 `supabase/functions/admin-reset-password/config.toml`：
+
+```toml
+verify_jwt = false
+```
+
+部署後請重新部署一次 function 以套用設定：
+
+```bash
+supabase functions deploy admin-reset-password
+```
 
 ## 快速開始
 

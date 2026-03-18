@@ -16,6 +16,27 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
   const checkingAuth = ref(false) // 用於追蹤是否正在檢查認證
 
+  function normalizeIdentifier (identifier) {
+    return (identifier || '').trim()
+  }
+
+  async function resolveLoginEmail (identifier) {
+    const normalized = normalizeIdentifier(identifier)
+    if (!normalized) return ''
+    if (normalized.includes('@')) return normalized
+    if (!isSupabaseAvailable()) return normalized
+
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('email')
+      .ilike('username', normalized)
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw error
+    return data?.email?.trim?.() || ''
+  }
+
   // Getters
   const currentUser = computed(() => {
     if (userProfile.value) {
@@ -42,14 +63,14 @@ export const useAuthStore = defineStore('auth', () => {
   async function login (identifier, password) {
     loading.value = true
     try {
-      // 如果 identifier 不是 email 格式，嘗試使用 username@company.com 格式
-      // 注意：Supabase Auth 只支援 email/password 登入
-      // 如果輸入的是 username，會嘗試使用 username@company.com 格式
-      let email = identifier
-      if (!identifier.includes('@')) {
-        // 可能是 username，嘗試使用 username@company.com 格式
-        // 這適用於開發環境或特定配置的用戶
-        email = `${identifier}@company.com`
+      const normalized = normalizeIdentifier(identifier)
+      if (!normalized) {
+        return { success: false, message: '請輸入 Email/使用者名稱' }
+      }
+
+      const email = await resolveLoginEmail(normalized)
+      if (!email || !email.includes('@')) {
+        return { success: false, message: '找不到此使用者名稱對應的 Email，請改用 Email 登入或聯繫管理員' }
       }
 
       // 使用 Supabase Auth 登入

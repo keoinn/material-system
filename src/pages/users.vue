@@ -92,11 +92,11 @@
             :items-per-page="10"
             class="elevation-1"
           >
-            <template #item.email="{ item }">
+            <template v-slot:[`item.email`]="{ item }">
               {{ item.email || 'N/A' }}
             </template>
 
-            <template #item.role="{ item }">
+            <template v-slot:[`item.role`]="{ item }">
               <v-chip
                 :color="getRoleColor(item.role)"
                 size="small"
@@ -106,11 +106,11 @@
               </v-chip>
             </template>
 
-            <template #item.department="{ item }">
+            <template v-slot:[`item.department`]="{ item }">
               {{ getDepartmentName(item.department) }}
             </template>
 
-            <template #item.is_active="{ item }">
+            <template v-slot:[`item.is_active`]="{ item }">
               <v-chip
                 :color="item.is_active ? 'success' : 'error'"
                 size="small"
@@ -120,15 +120,15 @@
               </v-chip>
             </template>
 
-            <template #item.created_at="{ item }">
+            <template v-slot:[`item.created_at`]="{ item }">
               {{ formatDate(item.created_at) }}
             </template>
 
-            <template #item.last_login="{ item }">
+            <template v-slot:[`item.last_login`]="{ item }">
               {{ item.last_login ? formatDate(item.last_login) : '從未登入' }}
             </template>
 
-            <template #item.actions="{ item }">
+            <template v-slot:[`item.actions`]="{ item }">
               <v-btn
                 color="info"
                 icon="mdi-pencil"
@@ -220,6 +220,9 @@
                 v-model="formData.newPassword"
                 label="新密碼（留空則不修改）"
                 :rules="[rules.min(6)]"
+                :disabled="!canChangePasswordInUi"
+                :hint="canChangePasswordInUi ? '' : 'Supabase 模式下前端只能修改自己密碼；若要改其他使用者密碼需後端/Edge Function'"
+                persistent-hint
                 type="password"
                 variant="outlined"
               />
@@ -330,11 +333,26 @@
 <script setup>
   import { computed, onMounted, reactive, ref } from 'vue'
   import { departmentsService, usersService } from '@/api/services'
+  import { isSupabaseBackend } from '@/api/client.js'
   import { useSwal } from '@/composables/useSwal'
+  import { useAuthStore } from '@/stores/auth'
   import DepartmentManagement from '@/components/DepartmentManagement.vue'
   import RolePermissionManagement from '@/components/RolePermissionManagement.vue'
 
   const swal = useSwal()
+  const authStore = useAuthStore()
+
+  const canChangePasswordInUi = computed(() => {
+    if (!isSupabaseBackend()) return true
+    const currentUserId = authStore.user?.id || null
+    const editingUserId = selectedUser.value?.id || null
+    const isAdmin = authStore.userProfile?.role === 'admin'
+    return Boolean(
+      currentUserId
+      && editingUserId
+      && (currentUserId === editingUserId || isAdmin),
+    )
+  })
 
   const activeTab = ref('users')
   const loading = ref(false)

@@ -212,6 +212,33 @@ export default {
       throw new Error('Supabase 客戶端未初始化')
     }
 
+    // 0. 如需更新密碼：Supabase client 只能更新「目前登入者」自己的密碼
+    if (updates?.password) {
+      const { data: authUserData, error: authUserError } = await supabase.auth.getUser()
+      if (authUserError) {
+        throw authUserError
+      }
+
+      const currentUserId = authUserData?.user?.id || null
+      if (currentUserId && currentUserId === id) {
+        const { error: passwordError } = await supabase.auth.updateUser({ password: updates.password })
+        if (passwordError) {
+          throw passwordError
+        }
+      } else {
+        // 管理者修改其他使用者密碼：透過 Edge Function（service role）
+        const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+          body: { userId: id, newPassword: updates.password },
+        })
+        if (error) {
+          throw error
+        }
+        if (data?.success !== true) {
+          throw new Error('修改密碼失敗')
+        }
+      }
+    }
+
     // 1. 更新 user_profiles
     const profileUpdates = {}
     if (updates.username !== undefined) profileUpdates.username = updates.username
