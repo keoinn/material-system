@@ -103,65 +103,44 @@
     }
   }
 
+  // 僅在「基本資料」內會影響產品大類／模板選擇的欄位變更時載入包裝模板。
+  // 若在任何欄位更新時都從 formValues 推斷大類並載入，使用者編輯其他區塊時也會觸發，導致 setValues 覆寫手動輸入。
+  const PACKAGING_TEMPLATE_TRIGGER_FIELD_KEYS = new Set([
+    'main_type',
+    'type',
+    'main_category',
+  ])
+
   // 處理欄位更新事件
   async function handleFieldUpdate (event) {
-    const { fieldKey, value, formValues } = event
+    const { fieldKey, value } = event
 
-    // 檢查是否是產品大類欄位的更新
+    if (!PACKAGING_TEMPLATE_TRIGGER_FIELD_KEYS.has(fieldKey)) {
+      return
+    }
+
     // 產品大類可能是：
     // 1. main_type - 單獨的欄位，值直接是產品大類代碼（如 'H', 'S', 'M'）
     // 2. type - cascading_select，值是一個數組，第一層是產品大類代碼
     // 3. main_category - 舊版欄位名稱（向後兼容）
     let mainCategoryCode = null
 
-    // 優先檢查 main_type 欄位
     if (fieldKey === 'main_type') {
       if (typeof value === 'string' && value) {
         mainCategoryCode = value
       }
-    }
-    // 檢查 type 欄位（cascading_select）
-    else if (fieldKey === 'type') {
+    } else if (fieldKey === 'type') {
       if (Array.isArray(value) && value.length > 0 && value[0]) {
         mainCategoryCode = value[0]
       }
-    }
-    // 向後兼容：檢查 main_category 欄位
-    else if (fieldKey === 'main_category') {
+    } else if (fieldKey === 'main_category') {
       if (Array.isArray(value) && value.length > 0 && value[0]) {
         mainCategoryCode = value[0]
       } else if (typeof value === 'string' && value) {
         mainCategoryCode = value
       }
     }
-    // 檢查 formValues 中是否有產品大類相關欄位
-    else {
-      // 優先檢查 main_type
-      if (formValues && formValues.main_type) {
-        const mainTypeValue = formValues.main_type
-        if (typeof mainTypeValue === 'string' && mainTypeValue) {
-          mainCategoryCode = mainTypeValue
-        }
-      }
-      // 檢查 type（cascading_select）
-      else if (formValues && formValues.type) {
-        const typeValue = formValues.type
-        if (Array.isArray(typeValue) && typeValue.length > 0 && typeValue[0]) {
-          mainCategoryCode = typeValue[0]
-        }
-      }
-      // 檢查 main_category（向後兼容）
-      else if (formValues && formValues.main_category) {
-        const mainCategoryValue = formValues.main_category
-        if (Array.isArray(mainCategoryValue) && mainCategoryValue.length > 0 && mainCategoryValue[0]) {
-          mainCategoryCode = mainCategoryValue[0]
-        } else if (typeof mainCategoryValue === 'string' && mainCategoryValue) {
-          mainCategoryCode = mainCategoryValue
-        }
-      }
-    }
 
-    // 如果找到產品大類代碼，載入對應的模板
     if (mainCategoryCode) {
       await loadTemplateForCategory(mainCategoryCode)
     }
