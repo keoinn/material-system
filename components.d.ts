@@ -12,6 +12,7 @@ declare module 'vue' {
     AppFooter: typeof import('./src/components/AppFooter.vue')['default']
     ApplicationQuery: typeof import('./src/components/ApplicationQuery.vue')['default']
     ApprovalWorkflowSettings: typeof import('./src/components/ApprovalWorkflowSettings.vue')['default']
+    BatchMaterialApplications: typeof import('./src/components/BatchMaterialApplications.vue')['default']
     CascadingSelectField: typeof import('./src/components/form-fields/CascadingSelectField.vue')['default']
     CascadingSelectLevel: typeof import('./src/components/form-fields/CascadingSelectLevel.vue')['default']
     CheckboxField: typeof import('./src/components/form-fields/CheckboxField.vue')['default']

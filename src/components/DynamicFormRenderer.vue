@@ -206,7 +206,7 @@
 </template>
 
 <script setup>
-  import { computed, onMounted, reactive, ref, watch } from 'vue'
+  import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
   import { formDataService } from '@/api/services/formData'
   import { formFieldsService } from '@/api/services/formFields'
   import { formsService } from '@/api/services/forms'
@@ -978,6 +978,15 @@
     Object.assign(formValues, values)
   }
 
+  async function applyInitialValuesIfNeeded () {
+    const newValues = props.initialValues || {}
+    if (!newValues || Object.keys(newValues).length === 0) {
+      return
+    }
+    await nextTick()
+    setValues(newValues)
+  }
+
   // 暴露方法給父組件
   defineExpose({
     validate,
@@ -990,6 +999,7 @@
   watch(() => props.formId, async () => {
     if (props.autoLoad) {
       await loadForm()
+      await applyInitialValuesIfNeeded()
       // 如果已經有 recordId，載入表單資料
       if (props.recordId) {
         await loadFormData()
@@ -1013,11 +1023,12 @@
     if (newValues && Object.keys(newValues).length > 0) {
       setValues(newValues)
     }
-  }, { deep: true })
+  }, { deep: true, immediate: true })
 
   onMounted(async () => {
     if (props.autoLoad) {
       await loadForm()
+      await applyInitialValuesIfNeeded()
       if (props.recordId) {
         await loadFormData()
       }
@@ -1055,10 +1066,6 @@
   color: #495057;
   margin-bottom: 15px;
   font-size: 1.1em;
-}
-
-.subgroup-content {
-  /* 不需要額外的 padding，因為 container 已經有 padding */
 }
 
 // 必填欄位的紅色星號

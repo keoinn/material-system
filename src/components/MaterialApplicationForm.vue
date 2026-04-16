@@ -11,13 +11,15 @@
 
     <DynamicFormRenderer
       v-if="defaultFormId"
+      :key="activeFormKey"
       ref="formRendererRef"
-      cancel-text="清除表單"
+      :cancel-text="cancelText"
       :form-id="defaultFormId"
+      :initial-values="activeInitialValues"
       :show-actions="true"
       :show-cancel="true"
       :show-title="true"
-      submit-text="提交申請"
+      :submit-text="submitText"
       @cancel="handleClear"
       @submit="handleSubmit"
       @field-update="handleFieldUpdate"
@@ -26,22 +28,39 @@
 </template>
 
 <script setup>
-  import { onMounted, ref } from 'vue'
-  import { useRouter } from 'vue-router'
+  import { computed, nextTick, onMounted, ref, watch } from 'vue'
+  import { useRoute, useRouter } from 'vue-router'
   import { formDataService } from '@/api/services/formData'
   import { formFieldsService } from '@/api/services/formFields'
   import { formsService } from '@/api/services/forms'
   import { packagingService } from '@/api/services/packaging'
   import { useSwal } from '@/composables/useSwal'
+  import { useBatchMaterialApplicationsStore } from '@/stores/batchMaterialApplications'
   import DynamicFormRenderer from './DynamicFormRenderer.vue'
 
-  const swal = useSwal()
+  const route = useRoute()
   const router = useRouter()
+  const swal = useSwal()
+  const batchStore = useBatchMaterialApplicationsStore()
 
   const formRendererRef = ref(null)
   const loading = ref(false)
   const defaultFormId = ref(null)
   const loadingTemplate = ref(false)
+
+  const selectedDraft = computed(() => batchStore.selectedDraft)
+  const activeInitialValues = computed(() => selectedDraft.value?.values || {})
+  const activeFormKey = computed(() => selectedDraft.value?.id || 'single-form')
+  const submitText = computed(() => selectedDraft.value ? '儲存草稿' : '提交申請')
+  const cancelText = computed(() => selectedDraft.value ? '清除目前草稿' : '清除表單')
+
+  async function syncDraftValuesToForm () {
+    if (!selectedDraft.value || !formRendererRef.value?.setValues) {
+      return
+    }
+    await nextTick()
+    formRendererRef.value.setValues({ ...(selectedDraft.value.values || {}) })
+  }
 
   // 載入預設表單
   async function loadDefaultForm () {
@@ -71,33 +90,36 @@
 
   // 處理表單提交
   async function handleSubmit (formValues) {
-    if (!defaultFormId.value) {
-      await swal.warning('表單尚未載入完成')
-      return
-    }
-
     try {
-      // 使用 formDataService 建立表單資料（新建記錄）
-      // 使用 createRecord 選項自動建立記錄 ID
-      const result = await formDataService.createFormData(defaultFormId.value, formValues, { createRecord: true })
+      if (!defaultFormId.value) {
+        await swal.warning('表單尚未載入完成')
+        return
+      }
 
+      if (selectedDraft.value) {
+        batchStore.updateDraftValues(selectedDraft.value.id, formValues)
+        await swal.success('草稿已儲存')
+        router.push({ path: '/', query: { tab: 'batch-apply' } })
+        return
+      }
+
+      const result = await formDataService.createFormData(defaultFormId.value, formValues, { createRecord: true })
       const recordId = result?.record_id || result?.id || 'N/A'
+
       await swal.success(`申請單號：${recordId}`, '申請已提交！')
 
-      // 清除表單
       handleClear()
-
-      // 跳轉到審核管理頁面
-      router.push({ path: '/', query: { tab: 'review' } })
     } catch (error) {
       console.error('提交申請失敗', error)
-      const errorMessage = error.message || '提交申請時發生錯誤'
-      await swal.error(errorMessage)
+      await swal.error(error.message || '提交申請時發生錯誤')
     }
   }
 
   // 處理清除表單
   function handleClear () {
+    if (selectedDraft.value) {
+      batchStore.updateDraftValues(selectedDraft.value.id, {})
+    }
     if (formRendererRef.value) {
       formRendererRef.value.reset()
     }
@@ -114,6 +136,10 @@
   // 處理欄位更新事件
   async function handleFieldUpdate (event) {
     const { fieldKey, value } = event
+
+    if (selectedDraft.value && event.formValues) {
+      batchStore.updateDraftValues(selectedDraft.value.id, event.formValues)
+    }
 
     if (!PACKAGING_TEMPLATE_TRIGGER_FIELD_KEYS.has(fieldKey)) {
       return
@@ -189,6 +215,22 @@
   onMounted(() => {
     loadDefaultForm()
   })
+
+  watch(() => route.query.batchDraftId, draftId => {
+    if (typeof draftId === 'string' && batchStore.hasDraft(draftId)) {
+      batchStore.selectDraft(draftId)
+      return
+    }
+    batchStore.selectDraft(null)
+  }, { immediate: true })
+
+  watch(
+    () => selectedDraft.value?.id,
+    async () => {
+      await syncDraftValuesToForm()
+    },
+    { immediate: true },
+  )
 </script>
 
 <style scoped lang="scss">

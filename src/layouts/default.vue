@@ -79,15 +79,15 @@
         </v-list-item>
         <v-divider />
 
-        <!-- 1. 物料申請 -->
+        <!-- 1. 單據申請 -->
         <v-list-item
           v-if="canApply"
-          @click="navigateToTab('apply')"
+          @click="navigateToTab('batch-apply')"
         >
           <template #prepend>
-            <v-icon>mdi-file-document-plus</v-icon>
+            <v-icon>mdi-table-plus</v-icon>
           </template>
-          <v-list-item-title>物料申請</v-list-item-title>
+          <v-list-item-title>單據申請</v-list-item-title>
         </v-list-item>
 
         <!-- 2. 申請查詢 -->

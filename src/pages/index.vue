@@ -19,7 +19,7 @@
             </v-card-title>
             <v-card-text>
               <v-row>
-                <!-- 1. 物料申請 -->
+                <!-- 1. 單據申請 -->
                 <v-col
                   v-if="canApply"
                   cols="12"
@@ -30,7 +30,7 @@
                   <v-card
                     class="module-card"
                     hover
-                    @click="navigateToModule('apply')"
+                    @click="navigateToModule('batch-apply')"
                   >
                     <v-card-text class="text-center pa-6">
                       <v-icon
@@ -38,9 +38,9 @@
                         color="primary"
                         class="mb-4"
                       >
-                        mdi-file-document-plus
+                        mdi-table-plus
                       </v-icon>
-                      <div class="text-h6">物料申請</div>
+                      <div class="text-h6">單據申請</div>
                     </v-card-text>
                   </v-card>
                 </v-col>
@@ -298,6 +298,14 @@
           <MaterialApplicationForm />
         </v-window-item>
 
+        <!-- 單據申請 -->
+        <v-window-item
+          v-if="canApply"
+          value="batch-apply"
+        >
+          <BatchMaterialApplications />
+        </v-window-item>
+
         <!-- 包裝說明設定 -->
         <v-window-item
           v-if="canPackaging"
@@ -379,6 +387,7 @@
   import { useRoute, useRouter } from 'vue-router'
   import ApplicationQuery from '@/components/ApplicationQuery.vue'
   import ApprovalWorkflowSettings from '@/components/ApprovalWorkflowSettings.vue'
+  import BatchMaterialApplications from '@/components/BatchMaterialApplications.vue'
   import ExcelExport from '@/components/ExcelExport.vue'
   import MaterialApplicationForm from '@/components/MaterialApplicationForm.vue'
   import OptionWorkbooks from '@/components/OptionWorkbooks.vue'
@@ -433,6 +442,7 @@
         // 檢查是否有權限訪問該 tab
         const tabPermissions = {
           'apply': canApply.value,
+          'batch-apply': canApply.value,
           'packaging': canPackaging.value,
           'review': canReview.value,
           'export': canExport.value,
@@ -463,7 +473,7 @@
           case 'n': {
             if (canApply.value) {
               e.preventDefault()
-              tab.value = 'apply'
+              tab.value = 'batch-apply'
             }
             break
           }
