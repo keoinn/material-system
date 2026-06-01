@@ -10,16 +10,21 @@
     "lint": "eslint . --fix"
   },
   "dependencies": {
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/language": "^6.12.3",
     "@fontsource/roboto": "5.2.6",
     "@handsontable/vue3": "^16.2.0",
     "@mdi/font": "7.4.47",
     "@mescius/spread-sheets": "^19.0.2",
     "@supabase/supabase-js": "^2.87.1",
     "axios": "^1.13.2",
+    "codemirror": "^6.0.2",
     "handsontable": "^16.2.0",
     "pinia": "^3.0.3",
     "sweetalert2": "^11.26.10",
     "vue": "^3.5.17",
+    "vue-codemirror": "^6.1.1",
     "vue3-excel-editor": "^1.0.60",
     "vuetify": "^3.9.1"
   },

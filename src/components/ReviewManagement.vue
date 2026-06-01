@@ -55,7 +55,7 @@
             size="small"
             @click="viewDetails(item.id)"
           >
-            詳情
+            預覽
           </v-btn>
         </template>
 
@@ -66,7 +66,7 @@
         </template>
       </v-data-table>
 
-      <!-- 申請詳情對話框 -->
+      <!-- 申請預覽對話框 -->
       <v-dialog
         v-model="detailDialog"
         max-width="900"
@@ -76,7 +76,7 @@
         <v-card v-if="selectedApplication">
           <v-card-title class="d-flex align-center bg-primary text-white">
             <v-icon class="mr-2">mdi-file-document-outline</v-icon>
-            <span>申請詳情</span>
+            <span>申請預覽</span>
             <v-spacer />
             <v-btn
               icon
@@ -701,8 +701,8 @@
 
       detailDialog.value = true
     } catch (error) {
-      console.error('載入申請詳情失敗', error)
-      await swal.error('載入申請詳情失敗，請稍後再試')
+      console.error('載入申請預覽失敗', error)
+      await swal.error('載入申請預覽失敗，請稍後再試')
     } finally {
       loading.value = false
     }

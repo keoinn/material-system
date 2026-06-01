@@ -1,7 +1,7 @@
 <template>
   <v-card>
     <v-card-title class="d-flex align-center">
-      <div class="text-h6">批次建立物料申請</div>
+      <div class="text-h6">項目主檔申請表</div>
       <v-spacer />
       <v-btn
         class="mr-2"
@@ -23,6 +23,19 @@
     </v-card-title>
 
     <v-card-text>
+      <v-row class="mb-4">
+        <v-col cols="12" md="4">
+          <v-text-field
+            v-model="searchKeyword"
+            clearable
+            label="搜尋草稿名稱"
+            prepend-inner-icon="mdi-magnify"
+            variant="outlined"
+            density="comfortable"
+            @click:clear="searchKeyword = ''"
+          />
+        </v-col>
+      </v-row>
       <v-data-table
         v-model="selectedDraftIds"
         :headers="headers"
@@ -71,7 +84,19 @@
             <v-btn
               icon
               size="x-small"
+              color="info"
+              variant="elevated"
+              :disabled="loadingDefaultForm || !defaultFormId"
+              :title="`預覽 ${item.name}`"
+              @click="openPreview(item)"
+            >
+              <v-icon>mdi-eye</v-icon>
+            </v-btn>
+            <v-btn
+              icon
+              size="x-small"
               color="primary"
+              variant="elevated"
               :title="`編輯 ${item.name}`"
               @click="openForm(item)"
             >
@@ -81,6 +106,7 @@
               icon
               size="x-small"
               color="info"
+              variant="elevated"
               :title="`複製 ${item.name}`"
               @click="duplicateDraft(item)"
             >
@@ -91,6 +117,7 @@
               icon
               size="x-small"
               color="error"
+              variant="elevated"
               @click="removeDraft(item)"
             >
               <v-icon>mdi-delete</v-icon>
@@ -100,7 +127,7 @@
 
         <template #no-data>
           <div class="text-center py-4">
-            尚未建立批次草稿，請先點擊「新增草稿」。
+            {{ hasSearchKeyword ? '找不到符合的草稿' : '尚未建立批次草稿，請先點擊「新增草稿」。' }}
           </div>
         </template>
       </v-data-table>
@@ -141,6 +168,113 @@
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <v-dialog
+    v-model="previewDialog"
+    max-width="900"
+    persistent
+    scrollable
+  >
+    <v-card v-if="previewDraft">
+      <v-card-title class="d-flex align-center bg-primary text-white">
+        <v-icon class="mr-2">mdi-file-document-outline</v-icon>
+        <span>申請預覽</span>
+        <v-spacer />
+        <v-btn
+          icon
+          variant="text"
+          @click="closePreview"
+        >
+          <v-icon>mdi-close</v-icon>
+        </v-btn>
+      </v-card-title>
+      <v-card-text class="pa-0">
+        <v-container>
+          <v-card
+            class="mb-4"
+            variant="outlined"
+          >
+            <v-card-title class="text-subtitle-1 bg-grey-lighten-4">
+              <v-icon class="mr-2">mdi-information</v-icon>
+              基本資訊
+            </v-card-title>
+            <v-card-text>
+              <v-row>
+                <v-col cols="12" md="6">
+                  <div class="detail-item">
+                    <span class="detail-label">草稿名稱：</span>
+                    <span class="detail-value">{{ previewDraft.name }}</span>
+                  </div>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <div class="detail-item">
+                    <span class="detail-label">狀態：</span>
+                    <v-chip
+                      :color="previewDraft.status === 'submitted' ? 'success' : 'warning'"
+                      size="small"
+                      variant="flat"
+                    >
+                      {{ previewDraft.status === 'submitted' ? '已送出' : '草稿' }}
+                    </v-chip>
+                  </div>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <div class="detail-item">
+                    <span class="detail-label">申請單號：</span>
+                    <span class="detail-value">{{ previewDraft.recordId || '-' }}</span>
+                  </div>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <div class="detail-item">
+                    <span class="detail-label">最後更新：</span>
+                    <span class="detail-value">{{ formatDate(previewDraft.updatedAt) }}</span>
+                  </div>
+                </v-col>
+              </v-row>
+            </v-card-text>
+          </v-card>
+          <v-card
+            v-if="defaultFormId"
+            variant="outlined"
+          >
+            <v-card-title class="text-subtitle-1 bg-grey-lighten-4">
+              <v-icon class="mr-2">mdi-form-select</v-icon>
+              表單資料
+            </v-card-title>
+            <v-card-text>
+              <v-alert
+                v-if="!hasAnyValue(previewDraft.values)"
+                type="info"
+                variant="tonal"
+              >
+                尚未填寫內容
+              </v-alert>
+              <DynamicFormRenderer
+                v-else
+                :key="previewDraft.id"
+                :form-id="defaultFormId"
+                :initial-values="previewDraft.values || {}"
+                :readonly="true"
+                :show-actions="false"
+                :show-title="false"
+              />
+            </v-card-text>
+          </v-card>
+        </v-container>
+      </v-card-text>
+      <v-divider />
+      <v-card-actions class="pa-4">
+        <v-spacer />
+        <v-btn
+          color="primary"
+          variant="flat"
+          @click="closePreview"
+        >
+          關閉
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script setup>
@@ -150,6 +284,7 @@ import { formDataService } from '@/api/services/formData'
 import { formsService } from '@/api/services/forms'
 import { useSwal } from '@/composables/useSwal'
 import { useBatchMaterialApplicationsStore } from '@/stores/batchMaterialApplications'
+import DynamicFormRenderer from './DynamicFormRenderer.vue'
 
 const router = useRouter()
 const swal = useSwal()
@@ -162,6 +297,9 @@ const selectedDraftIds = ref([])
 const renameDialog = ref(false)
 const renamingDraftId = ref(null)
 const renameDraftName = ref('')
+const previewDialog = ref(false)
+const previewDraft = ref(null)
+const searchKeyword = ref('')
 
 const headers = [
   { title: '草稿名稱', key: 'name', sortable: false },
@@ -172,7 +310,13 @@ const headers = [
 ]
 
 const drafts = computed(() => batchStore.drafts)
-const visibleDrafts = computed(() => drafts.value.filter(item => item.status === 'draft'))
+const hasSearchKeyword = computed(() => (searchKeyword.value || '').trim().length > 0)
+const visibleDrafts = computed(() => {
+  const keyword = (searchKeyword.value || '').trim().toLowerCase()
+  return drafts.value
+    .filter(item => item.status === 'draft')
+    .filter(item => !keyword || (item.name || '').toLowerCase().includes(keyword))
+})
 
 async function loadDefaultForm () {
   loadingDefaultForm.value = true
@@ -264,6 +408,22 @@ function openForm (item) {
   router.push({ path: '/', query: { tab: 'apply', batchDraftId: draftId } })
 }
 
+async function openPreview (item) {
+  const draft = getDraftRow(item)
+  if (!draft?.id) return
+  if (!defaultFormId.value) {
+    await swal.warning('表單尚未載入完成')
+    return
+  }
+  previewDraft.value = draft
+  previewDialog.value = true
+}
+
+function closePreview () {
+  previewDialog.value = false
+  previewDraft.value = null
+}
+
 function hasAnyValue (values) {
   return Object.values(values || {}).some(value => {
     if (Array.isArray(value)) return value.length > 0
@@ -338,3 +498,25 @@ onMounted(async () => {
   await loadDefaultForm()
 })
 </script>
+
+<style scoped lang="scss">
+.detail-item {
+  padding: 8px 0;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.6);
+  margin-right: 8px;
+  min-width: 100px;
+}
+
+.detail-value {
+  color: rgba(0, 0, 0, 0.87);
+  flex: 1;
+}
+</style>

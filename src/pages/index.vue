@@ -19,7 +19,7 @@
             </v-card-title>
             <v-card-text>
               <v-row>
-                <!-- 1. 單據申請 -->
+                <!-- 1. 項目主檔申請表 -->
                 <v-col
                   v-if="canApply"
                   cols="12"
@@ -40,7 +40,7 @@
                       >
                         mdi-table-plus
                       </v-icon>
-                      <div class="text-h6">單據申請</div>
+                      <div class="text-h6">項目主檔申請表</div>
                     </v-card-text>
                   </v-card>
                 </v-col>

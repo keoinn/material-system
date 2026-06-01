@@ -666,15 +666,30 @@
     <!-- 欄位編輯對話框 -->
     <v-dialog
       v-model="fieldDialog"
-      max-width="800"
+      content-class="field-edit-dialog-overlay"
       persistent
-      scrollable
+      :scrollable="false"
+      @after-enter="registerFieldDialogElements"
     >
-      <v-card>
-        <v-card-title class="d-flex align-center bg-primary text-white">
+      <div
+        ref="fieldDialogShellRef"
+        class="field-edit-dialog-shell"
+        :class="{ 'is-interacting': fieldDialogIsInteracting }"
+        :style="fieldDialogShellStyle"
+      >
+        <v-card class="field-edit-dialog-card">
+        <v-card-title
+          class="field-edit-dialog-title d-flex align-center bg-primary text-white flex-wrap ga-2"
+          @pointerdown="startFieldDialogDrag"
+        >
           <v-icon class="mr-2">{{ editingFieldIndex !== null ? 'mdi-pencil' : 'mdi-plus' }}</v-icon>
           <span>{{ editingFieldIndex !== null ? '編輯欄位' : '新增欄位' }}</span>
           <v-spacer />
+          <span
+            ref="fieldDialogSizeLabelRef"
+            class="field-dialog-size-label"
+            :class="{ 'field-dialog-size-label--active': fieldDialogIsInteracting }"
+          >{{ fieldDialogSizeLabel }}</span>
           <v-btn
             icon
             variant="text"
@@ -684,7 +699,7 @@
           </v-btn>
         </v-card-title>
 
-        <v-card-text class="pa-4">
+        <v-card-text class="field-edit-dialog-body pa-4">
           <v-form ref="fieldFormRef" v-model="fieldFormValid">
             <v-row>
               <!-- 非多層選單類型的通用設定 -->
@@ -1667,19 +1682,29 @@
               <!-- 欄位配置（JSON） -->
               <v-col cols="12">
                 <v-card class="pa-4" variant="outlined">
-                  <v-card-title class="text-subtitle-1">進階設定（JSON）</v-card-title>
+                  <v-card-title class="d-flex align-center text-subtitle-1 py-3">
+                    <span>進階設定（JSON）</span>
+                    <v-spacer />
+                    <v-btn
+                      color="primary"
+                      prepend-icon="mdi-code-json"
+                      size="small"
+                      variant="tonal"
+                      @click="openJsonEditorDialog"
+                    >
+                      編輯 JSON
+                    </v-btn>
+                  </v-card-title>
                   <v-card-text>
-                    <v-textarea
-                      v-model="fieldConfigJson"
-                      :error="jsonError"
-                      :error-messages="jsonError ? 'JSON 格式錯誤，請檢查語法' : ''"
-                      hint="JSON 格式的進階設定，會自動根據上方設定更新"
-                      label="欄位配置（JSON）"
-                      persistent-hint
-                      rows="8"
-                      variant="outlined"
-                      @blur="updateFieldDataFromJson"
-                    />
+                    <v-alert
+                      v-if="jsonError"
+                      class="mb-3"
+                      type="error"
+                      variant="tonal"
+                    >
+                      JSON 格式錯誤，請開啟編輯器修正
+                    </v-alert>
+                    <pre class="json-config-preview">{{ jsonPreviewText }}</pre>
                     <v-alert
                       class="mt-4"
                       type="info"
@@ -1689,9 +1714,8 @@
                         <strong>說明：</strong>
                         <ul class="mt-2">
                           <li>此 JSON 會自動根據上方的欄位設定更新</li>
-                          <li>您也可以手動編輯 JSON 來設定進階參數</li>
-                          <li>手動編輯後，請點擊其他區域或按 Tab 鍵來應用變更</li>
-                          <li>JSON 格式錯誤時會顯示錯誤提示</li>
+                          <li>點擊「編輯 JSON」可在獨立視窗中編輯進階參數</li>
+                          <li>編輯完成後請按「套用」以同步至欄位設定</li>
                         </ul>
                       </div>
                     </v-alert>
@@ -1721,7 +1745,199 @@
             儲存
           </v-btn>
         </v-card-actions>
-      </v-card>
+        </v-card>
+
+        <div
+          v-if="fieldDialogIsInteracting"
+          class="field-dialog-resize-indicator"
+          :style="fieldDialogResizeIndicatorStyle"
+          aria-live="polite"
+        >
+          {{ fieldDialogInteractionLabel }}
+        </div>
+
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-n"
+          title="拖曳調整高度"
+          @pointerdown.prevent="startFieldDialogResize('n', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-s"
+          title="拖曳調整高度"
+          @pointerdown.prevent="startFieldDialogResize('s', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-e"
+          title="拖曳調整寬度"
+          @pointerdown.prevent="startFieldDialogResize('e', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-w"
+          title="拖曳調整寬度"
+          @pointerdown.prevent="startFieldDialogResize('w', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-ne"
+          title="拖曳調整寬度與高度"
+          @pointerdown.prevent="startFieldDialogResize('ne', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-nw"
+          title="拖曳調整寬度與高度"
+          @pointerdown.prevent="startFieldDialogResize('nw', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-se"
+          title="拖曳調整寬度與高度"
+          @pointerdown.prevent="startFieldDialogResize('se', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-sw"
+          title="拖曳調整寬度與高度"
+          @pointerdown.prevent="startFieldDialogResize('sw', $event)"
+        />
+      </div>
+    </v-dialog>
+
+    <!-- JSON 進階設定編輯對話框 -->
+    <v-dialog
+      v-model="jsonEditorDialog"
+      content-class="json-editor-dialog-overlay"
+      persistent
+      :scrollable="false"
+      @after-enter="registerJsonEditorDialogElements"
+    >
+      <div
+        ref="jsonEditorShellRef"
+        class="field-edit-dialog-shell"
+        :class="{ 'is-interacting': jsonEditorIsInteracting }"
+        :style="jsonEditorShellStyle"
+      >
+        <v-card class="field-edit-dialog-card json-editor-dialog-card">
+          <v-card-title
+            class="field-edit-dialog-title d-flex align-center bg-primary text-white"
+            @pointerdown="startJsonEditorDrag"
+          >
+            <v-icon class="mr-2">mdi-code-json</v-icon>
+            <span>進階設定（JSON）</span>
+            <v-spacer />
+            <span
+              class="field-dialog-size-label"
+              :class="{ 'field-dialog-size-label--active': jsonEditorIsInteracting }"
+            >{{ jsonEditorSizeLabel }}</span>
+            <v-btn
+              icon
+              variant="text"
+              @click="closeJsonEditorDialog"
+            >
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </v-card-title>
+          <v-card-text class="field-edit-dialog-body pa-4">
+            <div class="text-subtitle-2 mb-2">欄位配置（JSON）</div>
+            <div
+              ref="jsonEditorPaneRef"
+              class="json-editor-pane"
+              :class="{ 'json-editor-pane--error': jsonEditorDraftError }"
+            >
+              <JsonCodeEditor v-model="jsonEditorDraft" />
+            </div>
+            <div
+              v-if="jsonEditorDraftError"
+              class="text-error text-caption mt-2"
+            >
+              JSON 格式錯誤，請檢查語法
+            </div>
+            <div class="text-caption text-medium-emphasis mt-2">
+              可拖曳編輯區右下角調整高度；編輯完成後請按「套用」同步至欄位設定
+            </div>
+            <v-alert
+              class="mt-4"
+              type="info"
+              variant="tonal"
+            >
+              <div class="text-body-2">
+                可手動調整進階參數；套用後會同步更新上方欄位設定與預覽。
+              </div>
+            </v-alert>
+          </v-card-text>
+          <v-divider />
+          <v-card-actions class="pa-4">
+            <v-btn
+              prepend-icon="mdi-format-align-left"
+              variant="text"
+              @click="formatJsonEditorDraft"
+            >
+              格式化
+            </v-btn>
+            <v-spacer />
+            <v-btn
+              variant="text"
+              @click="closeJsonEditorDialog"
+            >
+              取消
+            </v-btn>
+            <v-btn
+              color="primary"
+              :disabled="jsonEditorDraftError"
+              variant="flat"
+              @click="applyJsonEditor"
+            >
+              套用
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+
+        <div
+          v-if="jsonEditorIsInteracting"
+          class="field-dialog-resize-indicator"
+          :style="jsonEditorResizeIndicatorStyle"
+          aria-live="polite"
+        >
+          {{ jsonEditorInteractionLabel }}
+        </div>
+
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-n"
+          title="拖曳調整高度"
+          @pointerdown.prevent="startJsonEditorResize('n', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-s"
+          title="拖曳調整高度"
+          @pointerdown.prevent="startJsonEditorResize('s', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-e"
+          title="拖曳調整寬度"
+          @pointerdown.prevent="startJsonEditorResize('e', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-w"
+          title="拖曳調整寬度"
+          @pointerdown.prevent="startJsonEditorResize('w', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-ne"
+          title="拖曳調整寬度與高度"
+          @pointerdown.prevent="startJsonEditorResize('ne', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-nw"
+          title="拖曳調整寬度與高度"
+          @pointerdown.prevent="startJsonEditorResize('nw', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-se"
+          title="拖曳調整寬度與高度"
+          @pointerdown.prevent="startJsonEditorResize('se', $event)"
+        />
+        <div
+          class="field-dialog-resize-handle field-dialog-resize-handle-sw"
+          title="拖曳調整寬度與高度"
+          @pointerdown.prevent="startJsonEditorResize('sw', $event)"
+        />
+      </div>
     </v-dialog>
 
     <!-- 群組管理對話框 -->
@@ -2119,7 +2335,9 @@
   import { formFieldsService } from '@/api/services/formFields'
   import { formsService } from '@/api/services/forms'
   import { optionWorkbooksService } from '@/api/services/optionWorkbooks'
+  import { useResizable } from '@/composables/useResizable'
   import { useSwal } from '@/composables/useSwal'
+  import JsonCodeEditor from './JsonCodeEditor.vue'
   import AggregatedField from './form-fields/AggregatedField.vue'
   import CascadingSelectField from './form-fields/CascadingSelectField.vue'
   import CheckboxField from './form-fields/CheckboxField.vue'
@@ -2154,6 +2372,157 @@
   const saveProgress = ref(0) // 儲存進度百分比
   const fieldsTabRef = ref(null) // 欄位設定分頁的引用
   const fieldDialog = ref(false)
+  const fieldDialogShellRef = ref(null)
+  const fieldDialogSizeLabelRef = ref(null)
+  const {
+    size: fieldDialogSize,
+    position: fieldDialogPosition,
+    isInteracting: fieldDialogIsInteracting,
+    isDragging: fieldDialogIsDragging,
+    pointer: fieldDialogResizePointer,
+    shellStyle: fieldDialogShellStyle,
+    startResize: startFieldDialogResize,
+    startDrag: startFieldDialogDrag,
+    registerSurface: registerFieldDialogSurface,
+    clearSurfacePosition: clearFieldDialogSurfacePosition,
+  } = useResizable(
+    { width: 800, height: 680 },
+    {
+      minWidth: 560,
+      minHeight: 420,
+      maxHeight: () => window.innerHeight * 0.92,
+      storageKey: 'material-system.form-designer.field-edit-dialog',
+      zIndex: 1,
+    },
+  )
+
+  const fieldDialogSizeLabel = computed(() =>
+    `${Math.round(fieldDialogSize.width)} × ${Math.round(fieldDialogSize.height)}`,
+  )
+
+  const fieldDialogInteractionLabel = computed(() => {
+    if (fieldDialogIsDragging.value) {
+      return `位置 ${Math.round(fieldDialogPosition.x)} × ${Math.round(fieldDialogPosition.y)} px`
+    }
+    return `${fieldDialogSizeLabel.value} px`
+  })
+
+  const fieldDialogResizeIndicatorStyle = computed(() => ({
+    left: `${fieldDialogResizePointer.x}px`,
+    top: `${fieldDialogResizePointer.y}px`,
+  }))
+
+  function registerFieldDialogElements () {
+    registerFieldDialogSurface(fieldDialogShellRef.value)
+  }
+
+  const jsonEditorShellRef = ref(null)
+  const jsonEditorPaneRef = ref(null)
+  const JSON_EDITOR_TEXTAREA_MIN_HEIGHT = 200
+  const jsonEditorTextareaHeight = ref(360)
+  let jsonEditorTextareaResizeObserver = null
+  const {
+    size: jsonEditorSize,
+    position: jsonEditorPosition,
+    isInteracting: jsonEditorIsInteracting,
+    isDragging: jsonEditorIsDragging,
+    pointer: jsonEditorResizePointer,
+    shellStyle: jsonEditorShellStyle,
+    startResize: startJsonEditorResize,
+    startDrag: startJsonEditorDrag,
+    registerSurface: registerJsonEditorSurface,
+    clearSurfacePosition: clearJsonEditorSurfacePosition,
+    persistLayout: persistJsonEditorLayout,
+  } = useResizable(
+    { width: 960, height: 720 },
+    {
+      minWidth: 560,
+      minHeight: 420,
+      maxHeight: () => window.innerHeight * 0.92,
+      storageKey: 'material-system.form-designer.json-editor-dialog',
+      zIndex: 2,
+      getExtraStorage: () => ({
+        textareaHeight: Math.round(jsonEditorTextareaHeight.value),
+      }),
+      applyExtraStorage: (data) => {
+        if (typeof data.textareaHeight === 'number') {
+          jsonEditorTextareaHeight.value = Math.max(
+            JSON_EDITOR_TEXTAREA_MIN_HEIGHT,
+            Math.round(data.textareaHeight),
+          )
+        }
+      },
+    },
+  )
+
+  const jsonEditorSizeLabel = computed(() =>
+    `${Math.round(jsonEditorSize.width)} × ${Math.round(jsonEditorSize.height)}`,
+  )
+
+  const jsonEditorInteractionLabel = computed(() => {
+    if (jsonEditorIsDragging.value) {
+      return `位置 ${Math.round(jsonEditorPosition.x)} × ${Math.round(jsonEditorPosition.y)} px`
+    }
+    return `${jsonEditorSizeLabel.value} px`
+  })
+
+  const jsonEditorResizeIndicatorStyle = computed(() => ({
+    left: `${jsonEditorResizePointer.x}px`,
+    top: `${jsonEditorResizePointer.y}px`,
+  }))
+
+  function registerJsonEditorDialogElements () {
+    registerJsonEditorSurface(jsonEditorShellRef.value)
+    nextTick(() => {
+      setupJsonEditorTextareaObserver()
+    })
+  }
+
+  function getJsonEditorPaneElement () {
+    return jsonEditorPaneRef.value
+  }
+
+  function applyJsonEditorPaneHeight () {
+    const pane = getJsonEditorPaneElement()
+    if (!pane) {
+      return
+    }
+
+    pane.style.height = `${jsonEditorTextareaHeight.value}px`
+  }
+
+  function setupJsonEditorTextareaObserver () {
+    teardownJsonEditorTextareaObserver()
+
+    const pane = getJsonEditorPaneElement()
+    if (!pane) {
+      return
+    }
+
+    applyJsonEditorPaneHeight()
+
+    jsonEditorTextareaResizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const nextHeight = Math.round(entry.contentRect.height)
+        if (nextHeight < JSON_EDITOR_TEXTAREA_MIN_HEIGHT) {
+          continue
+        }
+        if (Math.abs(nextHeight - jsonEditorTextareaHeight.value) < 2) {
+          continue
+        }
+
+        jsonEditorTextareaHeight.value = nextHeight
+        persistJsonEditorLayout()
+      }
+    })
+
+    jsonEditorTextareaResizeObserver.observe(pane)
+  }
+
+  function teardownJsonEditorTextareaObserver () {
+    jsonEditorTextareaResizeObserver?.disconnect()
+    jsonEditorTextareaResizeObserver = null
+  }
   const editingFieldIndex = ref(null)
   const floatingWindowVisible = ref(false) // 懸浮視窗顯示狀態
   const fieldsHeaderRef = ref(null) // 原始功能列的引用
@@ -2213,6 +2582,23 @@
   const fieldConfigJson = ref('{}')
   const isUpdatingJsonFromData = ref(false) // 標記是否正在從 fieldData 更新 JSON（避免循環更新）
   const jsonError = ref(false) // JSON 格式錯誤標記
+  const jsonEditorDialog = ref(false)
+  const jsonEditorDraft = ref('')
+  const jsonEditorDraftError = ref(false)
+
+  const jsonPreviewText = computed(() => {
+    const text = (fieldConfigJson.value || '').trim()
+    if (!text) {
+      return '{}'
+    }
+
+    const lines = text.split('\n')
+    if (lines.length <= 8) {
+      return text
+    }
+
+    return `${lines.slice(0, 8).join('\n')}\n...`
+  })
   const groupDialog = ref(false)
   const editingGroupName = ref(null)
   const newGroupName = ref('')
@@ -2640,6 +3026,8 @@
 
   // 關閉欄位對話框
   function closeFieldDialog () {
+    closeJsonEditorDialog()
+    clearFieldDialogSurfacePosition()
     fieldDialog.value = false
     editingFieldIndex.value = null
   }
@@ -3649,6 +4037,61 @@
     } finally {
       isUpdatingJsonFromData.value = false
     }
+  }
+
+  function validateJsonEditorDraft () {
+    if (!jsonEditorDraft.value || jsonEditorDraft.value.trim() === '') {
+      jsonEditorDraftError.value = false
+      return true
+    }
+
+    try {
+      JSON.parse(jsonEditorDraft.value)
+      jsonEditorDraftError.value = false
+      return true
+    } catch {
+      jsonEditorDraftError.value = true
+      return false
+    }
+  }
+
+  function openJsonEditorDialog () {
+    updateJsonFromFieldData()
+    jsonEditorDraft.value = fieldConfigJson.value
+    jsonEditorDraftError.value = false
+    jsonEditorDialog.value = true
+  }
+
+  function closeJsonEditorDialog () {
+    teardownJsonEditorTextareaObserver()
+    clearJsonEditorSurfacePosition()
+    jsonEditorDialog.value = false
+  }
+
+  function formatJsonEditorDraft () {
+    if (!validateJsonEditorDraft()) {
+      return
+    }
+
+    try {
+      jsonEditorDraft.value = JSON.stringify(JSON.parse(jsonEditorDraft.value || '{}'), null, 2)
+    } catch {
+      jsonEditorDraftError.value = true
+    }
+  }
+
+  function applyJsonEditor () {
+    if (!validateJsonEditorDraft()) {
+      return
+    }
+
+    fieldConfigJson.value = jsonEditorDraft.value
+    updateFieldDataFromJson()
+    if (jsonError.value) {
+      return
+    }
+
+    closeJsonEditorDialog()
   }
 
   // 從 JSON 更新 fieldData（當用戶手動編輯 JSON 時）
@@ -4984,6 +5427,12 @@
     }
   })
 
+  watch(() => jsonEditorDraft.value, () => {
+    if (jsonEditorDialog.value) {
+      validateJsonEditorDraft()
+    }
+  })
+
   // 切換懸浮視窗（手動切換時清除自動顯示標記）
   function toggleFloatingWindow () {
     isAutoShowingFloatingWindow.value = false
@@ -5271,5 +5720,262 @@
     flex: 1 1 auto;
     min-width: 0;
   }
+}
+
+.field-edit-dialog-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  overflow: visible;
+  box-sizing: border-box;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.field-edit-dialog-shell.is-interacting {
+  will-change: left, top, width, height;
+}
+
+.field-edit-dialog-shell.is-interacting .field-edit-dialog-body {
+  pointer-events: none;
+  user-select: none;
+}
+
+.field-edit-dialog-title {
+  cursor: move;
+  touch-action: none;
+  flex: 0 0 auto;
+}
+
+.field-edit-dialog-title .v-btn {
+  cursor: pointer;
+}
+
+.field-edit-dialog-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.field-edit-dialog-card :deep(.v-card-actions) {
+  flex: 0 0 auto;
+}
+
+.field-edit-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.field-dialog-size-label {
+  font-size: 0.85rem;
+  opacity: 0.9;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.field-dialog-size-label--active {
+  opacity: 1;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 4px;
+  padding: 2px 10px;
+}
+
+.field-dialog-resize-indicator {
+  position: fixed;
+  z-index: 9999;
+  transform: translate(16px, 16px);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(33, 33, 33, 0.88);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
+  white-space: nowrap;
+}
+
+.field-dialog-resize-handle {
+  position: absolute;
+  z-index: 20;
+  touch-action: none;
+}
+
+.field-dialog-resize-handle-n {
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.field-dialog-resize-handle-s {
+  bottom: 0;
+  left: 12px;
+  right: 12px;
+  height: 12px;
+  cursor: ns-resize;
+}
+
+.field-dialog-resize-handle-e {
+  top: 12px;
+  right: 0;
+  width: 10px;
+  bottom: 12px;
+  cursor: ew-resize;
+}
+
+.field-dialog-resize-handle-w {
+  top: 12px;
+  left: 0;
+  width: 10px;
+  bottom: 12px;
+  cursor: ew-resize;
+}
+
+.field-dialog-resize-handle-ne {
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nesw-resize;
+}
+
+.field-dialog-resize-handle-nw {
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+
+.field-dialog-resize-handle-se {
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  border-bottom-right-radius: 8px;
+}
+
+.field-dialog-resize-handle-sw {
+  left: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nesw-resize;
+  border-bottom-left-radius: 8px;
+}
+
+.field-dialog-resize-handle-se::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid rgba(102, 126, 234, 0.55);
+  border-bottom: 2px solid rgba(102, 126, 234, 0.55);
+  pointer-events: none;
+}
+
+.field-dialog-resize-handle-n:hover,
+.field-dialog-resize-handle-s:hover,
+.field-dialog-resize-handle-e:hover,
+.field-dialog-resize-handle-w:hover,
+.field-dialog-resize-handle-ne:hover,
+.field-dialog-resize-handle-nw:hover,
+.field-dialog-resize-handle-se:hover,
+.field-dialog-resize-handle-sw:hover,
+.field-edit-dialog-shell.is-interacting .field-dialog-resize-handle {
+  background: rgba(102, 126, 234, 0.18);
+}
+
+.json-config-preview {
+  margin: 0;
+  padding: 12px 14px;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  max-height: 180px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: rgba(0, 0, 0, 0.78);
+}
+
+.json-editor-pane {
+  resize: vertical;
+  min-height: 200px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 4px;
+  background: #fafafa;
+}
+
+.json-editor-pane--error {
+  border-color: rgb(var(--v-theme-error));
+}
+
+.json-editor-pane :deep(.cm-editor) {
+  height: 100%;
+}
+
+.json-editor-pane:focus-within {
+  border-color: rgb(var(--v-theme-primary));
+  box-shadow: 0 0 0 1px rgb(var(--v-theme-primary));
+}
+</style>
+
+<style lang="scss">
+.v-overlay__content.field-edit-dialog-overlay,
+.v-overlay__content.json-editor-dialog-overlay {
+  overflow: visible !important;
+  max-height: none !important;
+  height: auto !important;
+  max-width: none !important;
+  width: auto !important;
+  margin: 0 !important;
+  pointer-events: none;
+}
+
+.v-overlay__content.field-edit-dialog-overlay.resizable-overlay-host,
+.v-overlay__content.json-editor-dialog-overlay.resizable-overlay-host {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: none !important;
+  max-width: none !important;
+  overflow: visible !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  pointer-events: none;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.v-overlay__content.field-edit-dialog-overlay.resizable-overlay-host .field-edit-dialog-shell,
+.v-overlay__content.json-editor-dialog-overlay.resizable-overlay-host .field-edit-dialog-shell {
+  pointer-events: auto;
+}
+
+body.resizable-surface-active {
+  user-select: none;
+}
+
+body.resizable-surface-active .v-overlay--scroll-blocked {
+  overflow: hidden;
 }
 </style>

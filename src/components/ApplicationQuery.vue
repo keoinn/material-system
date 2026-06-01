@@ -94,7 +94,7 @@
                 :loading="loadingDetails && selectedApplicationId === item.id"
                 @click="viewDetails(item.id)"
               >
-                詳情
+                預覽
               </v-btn>
             </template>
           </v-data-table>
@@ -109,7 +109,7 @@
         <v-card v-if="selectedApplication">
           <v-card-title class="d-flex align-center bg-primary text-white">
             <v-icon class="mr-2">mdi-file-document-outline</v-icon>
-            <span>申請詳情</span>
+            <span>申請預覽</span>
             <v-spacer />
             <v-btn
               icon
@@ -402,8 +402,8 @@ async function viewDetails (id) {
     }
     detailDialog.value = true
   } catch (error) {
-    console.error('獲取申請詳情失敗', error)
-    await swal.error('載入失敗', error.message || '無法取得申請詳情')
+    console.error('獲取申請預覽失敗', error)
+    await swal.error('載入失敗', error.message || '無法取得申請預覽')
   } finally {
     loadingDetails.value = false
     selectedApplicationId.value = null

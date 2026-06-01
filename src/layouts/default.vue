@@ -79,7 +79,7 @@
         </v-list-item>
         <v-divider />
 
-        <!-- 1. 單據申請 -->
+        <!-- 1. 項目主檔申請表 -->
         <v-list-item
           v-if="canApply"
           @click="navigateToTab('batch-apply')"
@@ -87,7 +87,7 @@
           <template #prepend>
             <v-icon>mdi-table-plus</v-icon>
           </template>
-          <v-list-item-title>單據申請</v-list-item-title>
+          <v-list-item-title>項目主檔申請表</v-list-item-title>
         </v-list-item>
 
         <!-- 2. 申請查詢 -->

@@ -13,154 +13,92 @@
       />
 
       <v-form ref="formRef" v-model="valid">
-        <!-- 按群組渲染欄位（支援子群組和群組順序） -->
-        <template v-for="(group, groupName) in groupedFields" :key="groupName">
-          <div v-if="((group.subGroups && Object.keys(group.subGroups).length > 0) || (group.ungrouped && group.ungrouped.length > 0)) && groupName !== '_ungrouped'" class="form-section">
-            <h3>{{ groupName }}</h3>
-            <!-- 按子群組分組顯示 -->
-            <template v-for="(subGroup, subGroupName) in getSubGroupsForDisplay(groupName, group)" :key="subGroupName">
-              <!-- 子群組容器（用方框包圍） -->
-              <div v-if="subGroupName" class="subgroup-container">
-                <h4 class="subgroup-title">{{ subGroupName }}</h4>
-                <div class="subgroup-content">
-                  <v-row>
-                    <template v-for="field in subGroup" :key="field.id">
-                      <!-- 多層選單：將每個層級作為獨立的 v-col 渲染 -->
-                      <template v-if="field.field_type === 'cascading_select' && field.field_config?.levels">
-                        <template
-                          v-for="(level, levelIndex) in field.field_config.levels"
-                          :key="`${field.id}-level-${levelIndex}`"
-                        >
-                          <v-col
-                            v-if="shouldShowField(field) && (level.is_visible !== false)"
-                            :cols="getLevelCols(level)"
-                            :md="getLevelMd(level)"
-                          >
-                            <CascadingSelectLevel
-                              :field="getFieldWithReadonly(field)"
-                              :level="level"
-                              :level-index="levelIndex"
-                              :loading="fieldLoading[field.field_key] || false"
-                              :selected-values="formValues[field.field_key] || []"
-                              @update:model-value="handleCascadingLevelUpdate(field.field_key, levelIndex, $event)"
-                            />
-                          </v-col>
-                        </template>
-                      </template>
-                      <!-- 其他欄位：正常渲染 -->
-                      <v-col
-                        v-else-if="shouldShowField(field)"
-                        :cols="getFieldCols(field)"
-                        :md="getFieldMd(field)"
-                      >
-                        <component
-                          :is="getFieldComponent(field.field_type)"
-                          :field="getFieldWithReadonly(field)"
-                          :form-values="formValues"
-                          :loading="fieldLoading[field.field_key] || false"
-                          :model-value="formValues[field.field_key]"
-                          :options="getFieldOptions(field)"
-                          @update:model-value="handleFieldUpdate(field.field_key, $event)"
-                        />
-                      </v-col>
-                    </template>
-                  </v-row>
-                </div>
-              </div>
-
-              <!-- 未分組到子群組的欄位 -->
-              <v-row v-else>
-                <template v-for="field in subGroup" :key="field.id">
-                  <!-- 多層選單：將每個層級作為獨立的 v-col 渲染 -->
-                  <template v-if="field.field_type === 'cascading_select' && field.field_config?.levels">
-                    <template
-                      v-for="(level, levelIndex) in field.field_config.levels"
-                      :key="`${field.id}-level-${levelIndex}`"
-                    >
-                      <v-col
-                        v-if="shouldShowField(field) && (level.is_visible !== false)"
-                        :cols="getLevelCols(level)"
-                        :md="getLevelMd(level)"
-                      >
-                        <CascadingSelectLevel
-                          :field="getFieldWithReadonly(field)"
-                          :level="level"
-                          :level-index="levelIndex"
-                          :loading="fieldLoading[field.field_key] || false"
-                          :selected-values="formValues[field.field_key] || []"
-                          @update:model-value="handleCascadingLevelUpdate(field.field_key, levelIndex, $event)"
-                        />
-                      </v-col>
-                    </template>
-                  </template>
-                  <!-- 其他欄位：正常渲染 -->
-                  <v-col
-                    v-else-if="shouldShowField(field)"
-                    :cols="getFieldCols(field)"
-                    :md="getFieldMd(field)"
-                  >
-                    <component
-                      :is="getFieldComponent(field.field_type)"
-                      :field="getFieldWithReadonly(field)"
-                      :form-values="formValues"
-                      :loading="fieldLoading[field.field_key] || false"
-                      :model-value="formValues[field.field_key]"
-                      :options="getFieldOptions(field)"
-                      @update:model-value="handleFieldUpdate(field.field_key, $event)"
-                    />
-                  </v-col>
-                </template>
-              </v-row>
-            </template>
-          </div>
-        </template>
-
-        <!-- 沒有群組的欄位 -->
-        <div v-if="ungroupedFields.length > 0" class="form-section">
-          <h3>未分組欄位</h3>
-          <v-row>
-            <template v-for="field in ungroupedFields" :key="field.id">
-              <!-- 多層選單：將每個層級作為獨立的 v-col 渲染 -->
-              <template v-if="field.field_type === 'cascading_select' && field.field_config?.levels">
-                <template
-                  v-for="(level, levelIndex) in field.field_config.levels"
-                  :key="`${field.id}-level-${levelIndex}`"
-                >
-                  <v-col
-                    v-if="shouldShowField(field) && (level.is_visible !== false)"
-                    :cols="getLevelCols(level)"
-                    :md="getLevelMd(level)"
-                  >
-                    <CascadingSelectLevel
-                      :field="field"
-                      :level="level"
-                      :level-index="levelIndex"
-                      :loading="fieldLoading[field.field_key] || false"
-                      :selected-values="formValues[field.field_key] || []"
-                      @update:model-value="handleCascadingLevelUpdate(field.field_key, levelIndex, $event)"
-                    />
-                  </v-col>
-                </template>
-              </template>
-              <!-- 其他欄位：正常渲染 -->
-              <v-col
-                v-else-if="shouldShowField(field)"
-                :cols="getFieldCols(field)"
-                :md="getFieldMd(field)"
-              >
-                <component
-                  :is="getFieldComponent(field.field_type)"
-                  :field="field"
-                  :form-values="formValues"
-                  :loading="fieldLoading[field.field_key] || false"
-                  :model-value="formValues[field.field_key]"
-                  :options="getFieldOptions(field)"
-                  @update:model-value="handleFieldUpdate(field.field_key, $event)"
-                />
-              </v-col>
-            </template>
-          </v-row>
+        <div
+          v-if="hasCollapsibleSections"
+          class="d-flex justify-end mb-2 ga-2"
+        >
+          <v-btn
+            color="primary"
+            size="small"
+            variant="text"
+            @click="expandAllSections"
+          >
+            全部展開
+          </v-btn>
+          <v-btn
+            color="primary"
+            size="small"
+            variant="text"
+            @click="collapseAllSections"
+          >
+            全部摺疊
+          </v-btn>
         </div>
+
+        <v-expansion-panels
+          v-model="expandedGroups"
+          class="form-group-panels"
+          multiple
+        >
+          <template v-for="(group, groupName) in groupedFields" :key="groupName">
+            <v-expansion-panel
+              v-if="hasGroupContent(group, groupName)"
+              :value="groupName"
+              class="form-section-panel"
+            >
+              <v-expansion-panel-title class="form-section-title">
+                {{ groupName }}
+              </v-expansion-panel-title>
+              <v-expansion-panel-text class="form-section-content">
+                <v-expansion-panels
+                  v-if="hasNamedSubGroups(groupName, group)"
+                  :model-value="getExpandedSubGroups(groupName)"
+                  class="subgroup-panels"
+                  multiple
+                  @update:model-value="setExpandedSubGroups(groupName, $event)"
+                >
+                  <v-expansion-panel
+                    v-for="(subGroup, subGroupName) in getNamedSubGroupsForDisplay(groupName, group)"
+                    :key="subGroupName"
+                    :value="subGroupName"
+                    class="subgroup-panel"
+                  >
+                    <v-expansion-panel-title class="subgroup-title">
+                      {{ subGroupName }}
+                    </v-expansion-panel-title>
+                    <v-expansion-panel-text class="subgroup-content">
+                      <DynamicFormFieldsRow :fields="subGroup" />
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+                </v-expansion-panels>
+
+                <DynamicFormFieldsRow
+                  v-if="getUngroupedFieldsInGroup(groupName, group).length > 0"
+                  :fields="getUngroupedFieldsInGroup(groupName, group)"
+                />
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+          </template>
+        </v-expansion-panels>
+
+        <v-expansion-panels
+          v-if="ungroupedFields.length > 0"
+          v-model="expandedUngrouped"
+          class="form-group-panels mt-4"
+          multiple
+        >
+          <v-expansion-panel
+            class="form-section-panel"
+            value="_ungrouped"
+          >
+            <v-expansion-panel-title class="form-section-title">
+              未分組欄位
+            </v-expansion-panel-title>
+            <v-expansion-panel-text class="form-section-content">
+              <DynamicFormFieldsRow :fields="ungroupedFields" />
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
       </v-form>
     </v-card-text>
 
@@ -206,14 +144,14 @@
 </template>
 
 <script setup>
-  import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+  import { computed, nextTick, onMounted, provide, reactive, ref, watch } from 'vue'
   import { formDataService } from '@/api/services/formData'
   import { formFieldsService } from '@/api/services/formFields'
   import { formsService } from '@/api/services/forms'
   import { optionWorkbooksService } from '@/api/services/optionWorkbooks'
+  import DynamicFormFieldsRow from './DynamicFormFieldsRow.vue'
   import AggregatedField from './form-fields/AggregatedField.vue'
   import CascadingSelectField from './form-fields/CascadingSelectField.vue'
-  import CascadingSelectLevel from './form-fields/CascadingSelectLevel.vue'
   import CheckboxField from './form-fields/CheckboxField.vue'
   import DateField from './form-fields/DateField.vue'
   import DatetimeField from './form-fields/DatetimeField.vue'
@@ -297,6 +235,9 @@
   const fieldOptions = reactive({}) // 儲存已載入的欄位選項
   const groupOrder = ref([]) // 群組順序
   const subGroups = ref(new Map()) // Map<groupName, Array<{name: string, order: number}>>
+  const expandedGroups = ref([])
+  const expandedSubGroups = reactive({})
+  const expandedUngrouped = ref([])
 
   // 欄位組件映射
   const fieldComponents = {
@@ -435,6 +376,74 @@
     return result
   }
 
+  function hasGroupContent (group, groupName) {
+    return groupName !== '_ungrouped'
+      && ((group.subGroups && Object.keys(group.subGroups).length > 0)
+        || (group.ungrouped && group.ungrouped.length > 0))
+  }
+
+  function getNamedSubGroupsForDisplay (groupName, groupData) {
+    const result = {}
+    for (const [subGroupName, fields] of Object.entries(getSubGroupsForDisplay(groupName, groupData))) {
+      if (subGroupName) {
+        result[subGroupName] = fields
+      }
+    }
+    return result
+  }
+
+  function getUngroupedFieldsInGroup (groupName, groupData) {
+    return getSubGroupsForDisplay(groupName, groupData)[''] || []
+  }
+
+  function hasNamedSubGroups (groupName, groupData) {
+    return Object.keys(getNamedSubGroupsForDisplay(groupName, groupData)).length > 0
+  }
+
+  function getAllGroupNames () {
+    return Object.keys(groupedFields.value).filter(groupName => hasGroupContent(groupedFields.value[groupName], groupName))
+  }
+
+  function getAllSubGroupNames (groupName) {
+    const groupData = groupedFields.value[groupName]
+    if (!groupData) {
+      return []
+    }
+    return Object.keys(getNamedSubGroupsForDisplay(groupName, groupData))
+  }
+
+  function getExpandedSubGroups (groupName) {
+    return expandedSubGroups[groupName] || []
+  }
+
+  function setExpandedSubGroups (groupName, value) {
+    expandedSubGroups[groupName] = value
+  }
+
+  function initExpandedState () {
+    expandedGroups.value = getAllGroupNames()
+    for (const groupName of expandedGroups.value) {
+      expandedSubGroups[groupName] = getAllSubGroupNames(groupName)
+    }
+    expandedUngrouped.value = ungroupedFields.value.length > 0 ? ['_ungrouped'] : []
+  }
+
+  function expandAllSections () {
+    initExpandedState()
+  }
+
+  function collapseAllSections () {
+    expandedGroups.value = []
+    for (const groupName of Object.keys(expandedSubGroups)) {
+      expandedSubGroups[groupName] = []
+    }
+    expandedUngrouped.value = []
+  }
+
+  const hasCollapsibleSections = computed(() => {
+    return getAllGroupNames().length > 0 || ungroupedFields.value.length > 0
+  })
+
   // 載入表單定義
   async function loadForm () {
     loading.value = true
@@ -490,6 +499,7 @@
 
         // 初始化表單值
         initializeFormValues()
+        initExpandedState()
       }
     } catch (error) {
       console.error('載入表單失敗', error)
@@ -1025,6 +1035,21 @@
     }
   }, { deep: true, immediate: true })
 
+  provide('dynamicFormContext', {
+    formValues,
+    fieldLoading,
+    shouldShowField,
+    getFieldWithReadonly,
+    getFieldComponent,
+    getFieldOptions,
+    handleFieldUpdate,
+    handleCascadingLevelUpdate,
+    getFieldCols,
+    getFieldMd,
+    getLevelCols,
+    getLevelMd,
+  })
+
   onMounted(async () => {
     if (props.autoLoad) {
       await loadForm()
@@ -1038,6 +1063,51 @@
 
 <style scoped lang="scss">
 @import '@/styles/material-system.scss';
+
+.form-group-panels {
+  :deep(.v-expansion-panel) {
+    background: transparent;
+  }
+
+  :deep(.form-section-panel) {
+    margin-bottom: 16px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  :deep(.form-section-title) {
+    color: #667eea;
+    font-size: 1.2em;
+    font-weight: 600;
+    min-height: 52px;
+  }
+
+  :deep(.form-section-content) {
+    padding-top: 0;
+  }
+}
+
+.subgroup-panels {
+  :deep(.subgroup-panel) {
+    background: #fff;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+
+  :deep(.subgroup-title) {
+    color: #495057;
+    font-size: 1.05em;
+    font-weight: 600;
+    min-height: 48px;
+  }
+
+  :deep(.subgroup-content) {
+    padding-top: 0;
+  }
+}
 
 .form-section {
   margin-bottom: 30px;
