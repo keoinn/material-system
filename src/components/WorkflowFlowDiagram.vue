@@ -129,7 +129,7 @@
                     v-if="node.type === 'start'"
                     class="workflow-flow-diagram__node workflow-flow-diagram__node--start"
                   >
-                    <div class="workflow-flow-diagram__node-order text-caption">起點</div>
+                    <div class="workflow-flow-diagram__node-order workflow-flow-diagram__node-order--label">起點</div>
                     <v-chip
                       :color="getStatusColor(workflow.initial_status_code)"
                       :size="large ? 'default' : 'small'"
@@ -143,7 +143,7 @@
                     v-else-if="node.type === 'end'"
                     class="workflow-flow-diagram__node workflow-flow-diagram__node--end"
                   >
-                    <div class="workflow-flow-diagram__node-order text-caption">完成</div>
+                    <div class="workflow-flow-diagram__node-order workflow-flow-diagram__node-order--label">完成</div>
                     <v-chip
                       :color="getStatusColor(workflow.final_status_code)"
                       :size="large ? 'default' : 'small'"
@@ -676,6 +676,24 @@
   width: 28px;
   height: 28px;
   font-size: 13px;
+}
+
+.workflow-flow-diagram__node-order.workflow-flow-diagram__node-order--label {
+  width: auto;
+  min-width: 36px;
+  padding: 0 8px;
+  border-radius: 6px;
+  box-sizing: border-box;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.workflow-flow-diagram--large .workflow-flow-diagram__node-order.workflow-flow-diagram__node-order--label {
+  width: auto;
+  min-width: 40px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 7px;
 }
 
 .workflow-flow-diagram__node-title {
