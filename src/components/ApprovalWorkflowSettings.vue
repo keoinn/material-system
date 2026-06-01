@@ -340,6 +340,13 @@
             流程步驟配置：{{ currentWorkflow.workflow_name }}
           </v-card-title>
           <v-card-text>
+            <WorkflowFlowPreview
+              :loading="loadingSteps"
+              :statuses="statuses"
+              :steps="workflowSteps"
+              :workflow="currentWorkflow"
+            />
+
             <div class="d-flex justify-end mb-4">
               <v-btn
                 color="primary"
@@ -569,6 +576,7 @@ import { approvalWorkflowsService } from '@/api/services/approvalWorkflows'
 import { systemOptionsService } from '@/api/services/systemOptions'
 import { usersService } from '@/api/services/users'
 import { useSwal } from '@/composables/useSwal'
+import WorkflowFlowPreview from '@/components/WorkflowFlowPreview.vue'
 
 const swal = useSwal()
 

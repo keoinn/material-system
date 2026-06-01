@@ -129,6 +129,9 @@ export default {
             status_icon: record.status_icon,
             current_step_name: record.current_step_name,
             workflow_name: record.workflow_name,
+            workflow_id: record.workflow_id,
+            current_step_id: record.current_step_id,
+            current_step_order: record.current_step_order,
           }
         } catch (error) {
           console.error(`載入申請 ${record.record_id} 的表單資料失敗`, error)
@@ -152,6 +155,9 @@ export default {
             status_icon: record.status_icon,
             current_step_name: record.current_step_name,
             workflow_name: record.workflow_name,
+            workflow_id: record.workflow_id,
+            current_step_id: record.current_step_id,
+            current_step_order: record.current_step_order,
           }
         }
       })
@@ -244,6 +250,9 @@ export default {
       status_icon: record.status_icon,
       current_step_name: record.current_step_name,
       workflow_name: record.workflow_name,
+      workflow_id: record.workflow_id,
+      current_step_id: record.current_step_id,
+      current_step_order: record.current_step_order,
     }
   },
 

@@ -45,5 +45,7 @@ declare module 'vue' {
     TextareaField: typeof import('./src/components/form-fields/TextareaField.vue')['default']
     TextField: typeof import('./src/components/form-fields/TextField.vue')['default']
     UrlField: typeof import('./src/components/form-fields/UrlField.vue')['default']
+    WorkflowFlowDiagram: typeof import('./src/components/WorkflowFlowDiagram.vue')['default']
+    WorkflowFlowPreview: typeof import('./src/components/WorkflowFlowPreview.vue')['default']
   }
 }
