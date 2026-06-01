@@ -375,6 +375,10 @@
       case 'file':
         return String(value)
 
+      case 'url':
+      case 'image_url':
+        return String(value)
+
       default:
         return String(value)
     }

@@ -2351,6 +2351,8 @@
   import SelectField from './form-fields/SelectField.vue'
   import TextareaField from './form-fields/TextareaField.vue'
   import TextField from './form-fields/TextField.vue'
+  import ImageUrlField from './form-fields/ImageUrlField.vue'
+  import UrlField from './form-fields/UrlField.vue'
 
   const props = defineProps({
     formId: {
@@ -2761,6 +2763,8 @@
     { title: '日期', value: 'date' },
     { title: '日期時間', value: 'datetime' },
     { title: '檔案', value: 'file' },
+    { title: '超連結', value: 'url' },
+    { title: '外部圖片 (超連結)', value: 'image_url' },
     { title: 'JSON', value: 'json' },
     { title: '聚合資料', value: 'aggregated' },
   ]
@@ -4917,6 +4921,8 @@
       date: 'teal',
       datetime: 'teal',
       file: 'red',
+      url: 'cyan',
+      image_url: 'cyan',
       json: 'grey',
     }
     return colors[type] || 'grey'
@@ -5243,6 +5249,8 @@
     datetime: DatetimeField,
     file: FileField,
     json: JsonField,
+    url: UrlField,
+    image_url: ImageUrlField,
     aggregated: AggregatedField,
   }
 

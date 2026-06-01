@@ -1271,6 +1271,8 @@ export default {
       case 'textarea':
       case 'select':
       case 'radio':
+      case 'url':
+      case 'image_url':
         result.field_value = String(value)
         break
 
@@ -1313,6 +1315,8 @@ export default {
       case 'textarea':
       case 'select':
       case 'radio':
+      case 'url':
+      case 'image_url':
         return dbValue.field_value
 
       case 'number':

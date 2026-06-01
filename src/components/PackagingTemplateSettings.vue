@@ -241,6 +241,8 @@
   import SelectField from './form-fields/SelectField.vue'
   import TextareaField from './form-fields/TextareaField.vue'
   import TextField from './form-fields/TextField.vue'
+  import ImageUrlField from './form-fields/ImageUrlField.vue'
+  import UrlField from './form-fields/UrlField.vue'
 
   const swal = useSwal()
 
@@ -280,6 +282,8 @@
     datetime: DatetimeField,
     file: FileField,
     json: JsonField,
+    url: UrlField,
+    image_url: ImageUrlField,
     aggregated: AggregatedField,
   }
 

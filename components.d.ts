@@ -24,6 +24,7 @@ declare module 'vue' {
     ExcelExport: typeof import('./src/components/ExcelExport.vue')['default']
     FileField: typeof import('./src/components/form-fields/FileField.vue')['default']
     FormDesigner: typeof import('./src/components/FormDesigner.vue')['default']
+    ImageUrlField: typeof import('./src/components/form-fields/ImageUrlField.vue')['default']
     JsonCodeEditor: typeof import('./src/components/JsonCodeEditor.vue')['default']
     JsonField: typeof import('./src/components/form-fields/JsonField.vue')['default']
     MaterialApplicationForm: typeof import('./src/components/MaterialApplicationForm.vue')['default']
@@ -43,5 +44,6 @@ declare module 'vue' {
     SystemSettings: typeof import('./src/components/SystemSettings.vue')['default']
     TextareaField: typeof import('./src/components/form-fields/TextareaField.vue')['default']
     TextField: typeof import('./src/components/form-fields/TextField.vue')['default']
+    UrlField: typeof import('./src/components/form-fields/UrlField.vue')['default']
   }
 }
