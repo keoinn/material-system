@@ -362,6 +362,37 @@
               :items="workflowSteps"
               :loading="loadingSteps"
             >
+              <template v-slot:[`item.step_order`]="{ item }">
+                <v-chip
+                  v-if="item.is_conditional"
+                  color="warning"
+                  size="small"
+                  variant="tonal"
+                >
+                  {{ formatConditionalInsertLabel(item) }}
+                </v-chip>
+                <span v-else>{{ item.step_order }}</span>
+              </template>
+
+              <template v-slot:[`item.is_conditional`]="{ item }">
+                <v-chip
+                  :color="item.is_conditional ? 'warning' : 'grey'"
+                  size="small"
+                  variant="flat"
+                >
+                  {{ item.is_conditional ? '條件型' : '一般' }}
+                </v-chip>
+              </template>
+
+              <template v-slot:[`item.trigger_condition`]="{ item }">
+                <span v-if="item.is_conditional">
+                  {{ item.trigger_field || '-' }}
+                  {{ getTriggerOperatorText(item.trigger_operator) }}
+                  {{ item.trigger_value || '-' }}
+                </span>
+                <span v-else class="text-grey">-</span>
+              </template>
+
               <template v-slot:[`item.approver_type`]="{ item }">
                 {{ getApproverTypeText(item.approver_type) }}
               </template>
@@ -438,30 +469,89 @@
             {{ editingStep?.id ? '編輯步驟' : '新增步驟' }}
           </v-card-title>
           <v-card-text>
-            <v-text-field
-              v-model.number="stepForm.step_order"
-              label="步驟順序 *"
-              type="number"
-              variant="outlined"
-              class="mb-2"
-            />
+            <v-row align="center" class="mb-2">
+              <v-col>
+                <v-text-field
+                  v-if="!stepForm.is_conditional"
+                  v-model.number="stepForm.step_order"
+                  label="步驟順序 *"
+                  type="number"
+                  variant="outlined"
+                  hide-details="auto"
+                />
+                <v-select
+                  v-else
+                  v-model="stepForm.trigger_insert_order"
+                  :items="conditionalInsertOptions"
+                  label="插入位置 *"
+                  variant="outlined"
+                  hint="表示介於流程步驟之間的觸發程序，例如 1 → 2"
+                  hide-details="auto"
+                />
+              </v-col>
+              <v-col cols="auto">
+                <v-switch
+                  v-model="stepForm.is_conditional"
+                  color="primary"
+                  hide-details
+                  label="條件型流程"
+                  @update:model-value="onConditionalToggle"
+                />
+              </v-col>
+            </v-row>
+
+            <template v-if="stepForm.is_conditional">
+              <v-select
+                v-model="stepForm.trigger_field"
+                :items="triggerFieldOptions"
+                label="觸發欄位 *"
+                variant="outlined"
+                class="mb-2"
+                hint="當表單欄位符合條件時，插入此審核步驟"
+                hide-details="auto"
+              />
+              <v-row class="mb-2">
+                <v-col cols="12" sm="4">
+                  <v-select
+                    v-model="stepForm.trigger_operator"
+                    :items="triggerOperatorOptions"
+                    label="觸發運算 *"
+                    variant="outlined"
+                    hide-details="auto"
+                  />
+                </v-col>
+                <v-col cols="12" sm="8">
+                  <v-text-field
+                    v-model="stepForm.trigger_value"
+                    label="觸發值 *"
+                    variant="outlined"
+                    hint="例如：更新資料庫"
+                    hide-details="auto"
+                  />
+                </v-col>
+              </v-row>
+            </template>
+
             <v-text-field
               v-model="stepForm.step_name"
               label="步驟名稱 *"
               variant="outlined"
               class="mb-2"
+              hide-details="auto"
             />
             <v-text-field
               v-model="stepForm.step_name_en"
               label="步驟名稱（英文）"
               variant="outlined"
               class="mb-2"
+              hide-details="auto"
             />
             <v-textarea
               v-model="stepForm.description"
               label="說明"
               variant="outlined"
               class="mb-2"
+              hide-details="auto"
             />
             <v-select
               v-model="stepForm.status_code"
@@ -470,7 +560,7 @@
               variant="outlined"
               class="mb-2"
               hint="此步驟執行時單據的狀態"
-              persistent-hint
+              hide-details="auto"
             />
             <v-select
               v-model="stepForm.approver_type"
@@ -478,6 +568,7 @@
               label="審核人類型 *"
               variant="outlined"
               class="mb-2"
+              hide-details="auto"
               @update:model-value="onApproverTypeChange"
             />
             <div v-if="stepForm.approver_type === 'USER'">
@@ -489,6 +580,7 @@
                 chips
                 variant="outlined"
                 class="mb-2"
+                hide-details="auto"
               />
             </div>
             <div v-if="stepForm.approver_type === 'ROLE'">
@@ -498,6 +590,7 @@
                 label="選擇角色 *"
                 variant="outlined"
                 class="mb-2"
+                hide-details="auto"
               />
             </div>
             <div v-if="stepForm.approver_type === 'DEPARTMENT'">
@@ -507,52 +600,59 @@
                 label="選擇部門 *"
                 variant="outlined"
                 class="mb-2"
+                hide-details="auto"
               />
             </div>
             
-            <!-- 審核權限部門（多選，始終顯示） -->
-            <v-select
-              v-model="stepForm.approval_departments"
-              :items="departmentOptions"
-              label="審核權限部門（可選）"
-              multiple
-              chips
-              variant="outlined"
-              class="mb-2"
-              hint="選擇哪些部門的使用者可以審核此步驟，會與審核人類型一起生效"
-              persistent-hint
-            />
-            
-            <!-- 審核人列表（多選，始終顯示，用於進一步篩選） -->
-            <v-combobox
-              v-model="stepForm.approver_user_ids"
-              :items="userOptions"
-              label="指定審核人（可選）"
-              multiple
-              chips
-              variant="outlined"
-              class="mb-2"
-              :hint="stepForm.approver_type === 'USER' ? '進一步篩選可審核的使用者，會與上面選擇的審核人一起生效' : '直接指定可審核的使用者，會與審核權限部門和審核人類型一起生效'"
-              persistent-hint
-            />
-            <v-select
-              v-model="stepForm.approve_status_code"
-              :items="statusOptions"
-              label="審核通過狀態 *"
-              variant="outlined"
-              class="mb-2"
-              hint="當審核通過時，單據要設定的狀態"
-              persistent-hint
-            />
-            <v-select
-              v-model="stepForm.reject_status_code"
-              :items="statusOptions"
-              label="退回狀態 *"
-              variant="outlined"
-              class="mb-2"
-              hint="當退回時，單據要設定的狀態"
-              persistent-hint
-            />
+            <!-- 審核權限部門 + 指定審核人（同一行） -->
+            <v-row class="mb-2">
+              <v-col cols="12" sm="6">
+                <v-select
+                  v-model="stepForm.approval_departments"
+                  :items="departmentOptions"
+                  label="審核權限部門（可選）"
+                  multiple
+                  chips
+                  variant="outlined"
+                  :hint="stepForm.approver_type === 'USER' ? '部門與指定審核人可一起篩選可審核的使用者' : '可指定審核權限部門，會與審核人類型一起生效'"
+                  hide-details="auto"
+                />
+              </v-col>
+              <v-col cols="12" sm="6">
+                <v-combobox
+                  v-model="stepForm.approver_user_ids"
+                  :items="userOptions"
+                  label="指定審核人（可選）"
+                  multiple
+                  chips
+                  variant="outlined"
+                  :hint="stepForm.approver_type === 'USER' ? '進一步篩選可審核的使用者' : '直接指定可審核的使用者'"
+                  hide-details="auto"
+                />
+              </v-col>
+            </v-row>
+            <v-row class="mb-2">
+              <v-col cols="12" sm="6">
+                <v-select
+                  v-model="stepForm.approve_status_code"
+                  :items="statusOptions"
+                  label="審核通過狀態 *"
+                  variant="outlined"
+                  hint="審核通過時，單據要設定的狀態"
+                  hide-details="auto"
+                />
+              </v-col>
+              <v-col cols="12" sm="6">
+                <v-select
+                  v-model="stepForm.reject_status_code"
+                  :items="statusOptions"
+                  label="退回狀態 *"
+                  variant="outlined"
+                  hint="退回時，單據要設定的狀態"
+                  hide-details="auto"
+                />
+              </v-col>
+            </v-row>
           </v-card-text>
           <v-card-actions>
             <v-spacer />
@@ -573,6 +673,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { approvalWorkflowsService } from '@/api/services/approvalWorkflows'
+import { formsService } from '@/api/services/forms'
 import { systemOptionsService } from '@/api/services/systemOptions'
 import { usersService } from '@/api/services/users'
 import { useSwal } from '@/composables/useSwal'
@@ -648,6 +749,11 @@ const workflowSteps = ref([])
 const editingStep = ref(null)
 const stepForm = ref({
   step_order: 1,
+  is_conditional: false,
+  trigger_insert_order: 0,
+  trigger_field: '',
+  trigger_operator: 'equals',
+  trigger_value: '',
   step_name: '',
   step_name_en: '',
   description: '',
@@ -664,8 +770,10 @@ const stepForm = ref({
 })
 
 const stepHeaders = [
-  { title: '順序', key: 'step_order' },
+  { title: '順序 / 插入點', key: 'step_order' },
+  { title: '類型', key: 'is_conditional' },
   { title: '步驟名稱', key: 'step_name' },
+  { title: '觸發條件', key: 'trigger_condition' },
   { title: '狀態', key: 'status_code' },
   { title: '審核人類型', key: 'approver_type' },
   { title: '審核權限部門', key: 'approval_departments' },
@@ -680,7 +788,17 @@ const approverTypeOptions = [
   { title: '自動通過', value: 'AUTO' },
 ]
 
+const triggerOperatorOptions = [
+  { title: '等於', value: 'equals' },
+  { title: '不等於', value: 'not_equals' },
+  { title: '包含', value: 'contains' },
+  { title: '不包含', value: 'not_contains' },
+  { title: '開頭為', value: 'starts_with' },
+  { title: '結尾為', value: 'ends_with' },
+]
+
 const userOptions = ref([])
+const triggerFieldOptions = ref([])
 const departmentOptions = ref([])
 const roleOptions = [
   { title: '系統管理員', value: 'admin' },
@@ -713,6 +831,25 @@ const rejectStatusOptions = computed(() => {
       title: `${s.status_name} (${s.status_code})`,
       value: s.status_code,
     }))
+})
+
+const regularWorkflowSteps = computed(() => {
+  return workflowSteps.value
+    .filter(step => !step.is_conditional)
+    .sort((a, b) => a.step_order - b.step_order)
+})
+
+const conditionalInsertOptions = computed(() => {
+  const options = [{ title: '0 → 1', value: 0 }]
+
+  regularWorkflowSteps.value.forEach(step => {
+    options.push({
+      title: `${step.step_order} → ${step.step_order + 1}`,
+      value: step.step_order,
+    })
+  })
+
+  return options
 })
 
 // 載入資料
@@ -761,6 +898,28 @@ async function loadUsers () {
     }))
   } catch (error) {
     console.error('載入使用者失敗', error)
+  }
+}
+
+async function loadTriggerFieldOptions () {
+  try {
+    const forms = await formsService.getForms({ is_active: true })
+    const defaultForm = forms.find(form => form.is_default) || forms[0]
+    if (!defaultForm) {
+      triggerFieldOptions.value = []
+      return
+    }
+
+    const form = await formsService.getForm(defaultForm.id, true)
+    triggerFieldOptions.value = (form.fields || [])
+      .filter(field => field.field_key && !['status', 'approval_status'].includes(field.field_key))
+      .map(field => ({
+        title: `${field.field_label || field.field_key} (${field.field_key})`,
+        value: field.field_key,
+      }))
+  } catch (error) {
+    console.error('載入觸發欄位選項失敗', error)
+    triggerFieldOptions.value = []
   }
 }
 
@@ -891,16 +1050,47 @@ async function deleteWorkflow (workflow) {
 
 async function viewWorkflowSteps (workflow) {
   currentWorkflow.value = workflow
-  await loadWorkflowSteps(workflow.id)
+  await Promise.all([
+    loadWorkflowSteps(workflow.id),
+    loadTriggerFieldOptions(),
+  ])
   stepsDialog.value = true
 }
 
+function formatConditionalInsertLabel (step) {
+  const insertOrder = step.trigger_insert_order ?? 0
+  return `${insertOrder} → ${insertOrder + 1}`
+}
+
+function computeConditionalStepOrder (triggerInsertOrder, excludeStepId = null) {
+  const samePointSteps = workflowSteps.value.filter(step =>
+    step.is_conditional
+    && step.trigger_insert_order === triggerInsertOrder
+    && step.id !== excludeStepId
+  )
+  const sequence = samePointSteps.length + 1
+  return 10000 + (triggerInsertOrder * 100) + sequence
+}
+
+function getNextRegularStepOrder () {
+  const regularSteps = workflowSteps.value.filter(step => !step.is_conditional)
+  if (regularSteps.length === 0) {
+    return 1
+  }
+  return Math.max(...regularSteps.map(step => step.step_order)) + 1
+}
+
 // 步驟操作
-function openStepDialog (step = null) {
+async function openStepDialog (step = null) {
   editingStep.value = step
   if (step) {
     stepForm.value = {
       ...step,
+      is_conditional: !!step.is_conditional,
+      trigger_insert_order: step.trigger_insert_order ?? 0,
+      trigger_field: step.trigger_field || '',
+      trigger_operator: step.trigger_operator || 'equals',
+      trigger_value: step.trigger_value || '',
       user_ids: step.approver_config?.user_ids || [],
       role: step.approver_config?.role || null,
       department: step.approver_config?.department || null,
@@ -911,7 +1101,12 @@ function openStepDialog (step = null) {
     }
   } else {
     stepForm.value = {
-      step_order: workflowSteps.value.length + 1,
+      step_order: getNextRegularStepOrder(),
+      is_conditional: false,
+      trigger_insert_order: 0,
+      trigger_field: '',
+      trigger_operator: 'equals',
+      trigger_value: '',
       step_name: '',
       step_name_en: '',
       description: '',
@@ -928,6 +1123,20 @@ function openStepDialog (step = null) {
     }
   }
   stepDialog.value = true
+  if (triggerFieldOptions.value.length === 0) {
+    await loadTriggerFieldOptions()
+  }
+}
+
+function onConditionalToggle (enabled) {
+  if (enabled) {
+    stepForm.value.trigger_insert_order = stepForm.value.trigger_insert_order ?? 0
+    return
+  }
+
+  if (!stepForm.value.step_order) {
+    stepForm.value.step_order = getNextRegularStepOrder()
+  }
 }
 
 function onApproverTypeChange () {
@@ -939,9 +1148,27 @@ function onApproverTypeChange () {
 
 async function saveStep () {
   try {
+    if (stepForm.value.is_conditional) {
+      if (stepForm.value.trigger_insert_order === null || stepForm.value.trigger_insert_order === undefined) {
+        await swal.error('請選擇插入位置')
+        return
+      }
+      if (!stepForm.value.trigger_field) {
+        await swal.error('請選擇觸發欄位')
+        return
+      }
+      if (!stepForm.value.trigger_operator) {
+        await swal.error('請選擇觸發運算')
+        return
+      }
+      if (!stepForm.value.trigger_value) {
+        await swal.error('請輸入觸發值')
+        return
+      }
+    }
+
     const data = {
       workflow_id: currentWorkflow.value.id,
-      step_order: stepForm.value.step_order,
       step_name: stepForm.value.step_name,
       step_name_en: stepForm.value.step_name_en,
       description: stepForm.value.description,
@@ -951,6 +1178,20 @@ async function saveStep () {
       approver_user_ids: stepForm.value.approver_user_ids || [],
       approve_status_code: stepForm.value.approve_status_code,
       reject_status_code: stepForm.value.reject_status_code,
+      is_conditional: !!stepForm.value.is_conditional,
+      trigger_insert_order: stepForm.value.is_conditional ? stepForm.value.trigger_insert_order : null,
+      trigger_field: stepForm.value.is_conditional ? stepForm.value.trigger_field : null,
+      trigger_value: stepForm.value.is_conditional ? stepForm.value.trigger_value : null,
+      trigger_operator: stepForm.value.is_conditional ? stepForm.value.trigger_operator : null,
+    }
+
+    if (stepForm.value.is_conditional) {
+      data.step_order = computeConditionalStepOrder(
+        stepForm.value.trigger_insert_order,
+        editingStep.value?.id || null
+      )
+    } else {
+      data.step_order = stepForm.value.step_order
     }
 
     // 根據審核人類型設定配置
@@ -1020,6 +1261,11 @@ function getApproverTypeText (type) {
   return texts[type] || type
 }
 
+function getTriggerOperatorText (operator) {
+  const option = triggerOperatorOptions.find(item => item.value === operator)
+  return option?.title || operator || '等於'
+}
+
 function getDepartmentLabel (deptKey) {
   const dept = departmentOptions.value.find(d => d.value === deptKey)
   return dept ? dept.title : deptKey
@@ -1036,6 +1282,7 @@ onMounted(async () => {
     loadWorkflows(),
     loadDepartments(),
     loadUsers(),
+    loadTriggerFieldOptions(),
   ])
 })
 </script>

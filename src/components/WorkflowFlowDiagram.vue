@@ -285,7 +285,9 @@
   })
 
   const sortedSteps = computed(() => {
-    return [...props.steps].sort((a, b) => a.step_order - b.step_order)
+    return [...props.steps]
+      .filter(step => !step.is_conditional)
+      .sort((a, b) => a.step_order - b.step_order)
   })
 
   const flowNodes = computed(() => {

@@ -1,67 +1,86 @@
 -- ============================================================================
 -- 移除所有資料表結構的 SQL 語句
 -- ============================================================================
--- 注意：此腳本會刪除所有資料表、觸發器和函數
+-- 注意：此腳本會刪除所有應用程式資料表、視圖、觸發器和函數
 -- 執行前請確認已備份重要資料和結構
--- 
--- 此腳本僅移除保留的資料表：
--- - code_counters, export_logs, attachments, form_data_values, 
--- - form_fields, forms, system_options, system_settings, user_profiles
+--
+-- 涵蓋全部 23 張資料表（與 supabase_schema_master.sql 一致）
 -- ============================================================================
 
--- 1. 刪除所有觸發器（按照表順序）
--- 1.1 刪除表單相關觸發器
-DROP TRIGGER IF EXISTS update_form_data_values_updated_at ON form_data_values;
-DROP TRIGGER IF EXISTS update_form_fields_updated_at ON form_fields;
-DROP TRIGGER IF EXISTS update_forms_updated_at ON forms;
+-- 1. 刪除視圖
+DROP VIEW IF EXISTS pending_approval_applications_view CASCADE;
+DROP VIEW IF EXISTS pending_applications_view CASCADE;
 
--- 1.2 刪除其他表觸發器
-DROP TRIGGER IF EXISTS update_code_counters_updated_at ON code_counters;
-DROP TRIGGER IF EXISTS update_system_options_updated_at ON system_options;
-DROP TRIGGER IF EXISTS update_system_settings_updated_at ON system_settings;
-DROP TRIGGER IF EXISTS update_user_profiles_updated_at ON user_profiles;
-
--- 1.3 刪除 auth.users 上的觸發器
+-- 2. 刪除 auth.users 上的觸發器
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 
--- 2. 刪除所有資料表（按照外鍵依賴順序，先刪除子表，再刪除父表）
--- 2.1 刪除表單資料值表（最底層，依賴 form_fields 和 forms）
+-- 3. 刪除所有資料表（按照外鍵依賴順序，先刪除子表，再刪除父表）
+
+-- 3.1 審核流程（子表 → 父表）
+DROP TABLE IF EXISTS approval_action_logs CASCADE;
+DROP TABLE IF EXISTS approval_records CASCADE;
+DROP TABLE IF EXISTS approval_workflow_steps CASCADE;
+DROP TABLE IF EXISTS approval_workflows CASCADE;
+DROP TABLE IF EXISTS approval_statuses CASCADE;
+
+-- 3.2 角色權限
+DROP TABLE IF EXISTS role_page_access CASCADE;
+DROP TABLE IF EXISTS role_permissions CASCADE;
+
+-- 3.3 選項活頁簿
+DROP TABLE IF EXISTS option_workbook_rows CASCADE;
+DROP TABLE IF EXISTS option_workbook_columns CASCADE;
+DROP TABLE IF EXISTS option_workbooks CASCADE;
+
+-- 3.4 包裝模板
+DROP TABLE IF EXISTS packaging_templates CASCADE;
+
+-- 3.5 表單與資料
 DROP TABLE IF EXISTS form_data_values CASCADE;
-
--- 2.2 刪除附件表（可能關聯到表單記錄）
 DROP TABLE IF EXISTS attachments CASCADE;
-
--- 2.3 刪除表單欄位定義表（依賴 forms）
 DROP TABLE IF EXISTS form_fields CASCADE;
-
--- 2.4 刪除表單定義表
 DROP TABLE IF EXISTS forms CASCADE;
 
--- 2.5 刪除編碼計數器表（依賴 user_profiles）
-DROP TABLE IF EXISTS code_counters CASCADE;
+-- 3.6 部門（依賴 user_profiles，含自引用 parent_id）
+DROP TABLE IF EXISTS departments CASCADE;
 
--- 2.6 刪除匯出記錄表（依賴 user_profiles）
+-- 3.7 其他依賴 user_profiles 的表
+DROP TABLE IF EXISTS code_counters CASCADE;
 DROP TABLE IF EXISTS export_logs CASCADE;
 
--- 2.7 刪除系統選項表
-DROP TABLE IF EXISTS system_options CASCADE;
+-- 3.8 角色與權限主表
+DROP TABLE IF EXISTS permissions CASCADE;
+DROP TABLE IF EXISTS roles CASCADE;
 
--- 2.8 刪除系統設定表
+-- 3.9 系統表
+DROP TABLE IF EXISTS system_options CASCADE;
 DROP TABLE IF EXISTS system_settings CASCADE;
 
--- 2.9 刪除使用者資料表（注意：此表關聯到 auth.users，但我們只刪除應用程式層面的表）
--- 注意：刪除 user_profiles 前，需先刪除依賴它的表（code_counters, export_logs）
+-- 3.10 使用者資料表
 DROP TABLE IF EXISTS user_profiles CASCADE;
 
--- 3. 刪除函數
+-- 4. 刪除舊版/已棄用資料表（若仍存在）
+DROP TABLE IF EXISTS application_packaging CASCADE;
+DROP TABLE IF EXISTS approval_logs CASCADE;
+DROP TABLE IF EXISTS applications CASCADE;
+DROP TABLE IF EXISTS drafts CASCADE;
+DROP TABLE IF EXISTS category_packaging_defaults CASCADE;
+DROP TABLE IF EXISTS packaging_options CASCADE;
+DROP TABLE IF EXISTS packaging_categories CASCADE;
+DROP TABLE IF EXISTS suppliers CASCADE;
+DROP TABLE IF EXISTS product_categories CASCADE;
+
+-- 5. 刪除函數
+DROP FUNCTION IF EXISTS public.get_users_with_email(VARCHAR, BOOLEAN, VARCHAR) CASCADE;
+DROP FUNCTION IF EXISTS public.get_current_approvers(BIGINT) CASCADE;
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+DROP FUNCTION IF EXISTS public.sync_user_profiles_email() CASCADE;
 DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
 
 -- ============================================================================
 -- 驗證刪除結果（可選）
 -- ============================================================================
--- 查詢所有剩餘的資料表（應該只剩下 Supabase 系統表）
--- SELECT table_name 
--- FROM information_schema.tables 
--- WHERE table_schema = 'public' 
+-- SELECT table_name
+-- FROM information_schema.tables
+-- WHERE table_schema = 'public'
 -- ORDER BY table_name;

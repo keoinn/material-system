@@ -385,19 +385,17 @@ export default {
     // 初始狀態設為 DRAFT
     recordData.current_status_code = 'DRAFT'
 
-    // 如果找到 workflow_id，取得第一個步驟
+    // 如果找到 workflow_id，取得第一個步驟（含條件型分支判斷）
     let firstStep = null
     if (recordData.workflow_id) {
-      const { data: step } = await supabase
-        .from('approval_workflow_steps')
-        .select('id, status_code, approver_type')
-        .eq('workflow_id', recordData.workflow_id)
-        .eq('step_order', 1)
-        .single()
+      firstStep = await this._resolveInitialStep(
+        recordData.workflow_id,
+        recordData.form_id,
+        recordData.record_id
+      )
 
-      if (step) {
-        firstStep = step
-        recordData.current_step_id = step.id
+      if (firstStep) {
+        recordData.current_step_id = firstStep.id
       }
     }
 
@@ -640,6 +638,34 @@ export default {
 
     // 根據操作類型決定下一步
     if (action === 'APPROVE') {
+      const conditionalNext = await this._resolveConditionalNextStep(record, currentStep)
+
+      if (conditionalNext) {
+        nextStepId = conditionalNext.id
+        toStatus = conditionalNext.status_code
+        isCompleted = false
+      } else if (currentStep.is_conditional) {
+        const nextRegularStep = await this._getRegularStepByOrder(
+          record.workflow_id,
+          currentStep.trigger_insert_order + 1
+        )
+
+        if (nextRegularStep) {
+          nextStepId = nextRegularStep.id
+          toStatus = nextRegularStep.status_code
+          isCompleted = false
+        } else {
+          const { data: workflow } = await supabase
+            .from('approval_workflows')
+            .select('final_status_code')
+            .eq('id', record.workflow_id)
+            .single()
+
+          toStatus = currentStep.approve_status_code || workflow?.final_status_code || 'APPROVED'
+          isCompleted = toStatus === 'APPROVED'
+          nextStepId = null
+        }
+      } else {
       // 核准：移到下一步驟
       nextStepId = currentStep.next_step_on_approve
 
@@ -699,6 +725,7 @@ export default {
             nextStepId = stepByStatus.id
           }
         }
+      }
       }
     } else if (action === 'REJECT' || action === 'RETURN') {
       // 退回：使用當前步驟的 reject_status_code
@@ -1364,6 +1391,134 @@ export default {
       console.error('建立操作記錄失敗', error)
       // 不拋出錯誤，因為這不應該影響主要操作
     }
+  },
+
+  /**
+   * 內部方法：讀取表單欄位值
+   */
+  async _getFormFieldValue (formId, recordId, fieldKey) {
+    if (!formId || !recordId || !fieldKey) {
+      return null
+    }
+
+    const { data } = await supabase
+      .from('form_data_values')
+      .select('field_value')
+      .eq('form_id', formId)
+      .eq('record_id', recordId)
+      .eq('field_key', fieldKey)
+      .maybeSingle()
+
+    return data?.field_value ?? null
+  },
+
+  /**
+   * 內部方法：比對觸發值
+   */
+  _compareTriggerValue (actualValue, expectedValue, operator = 'equals') {
+    const actual = actualValue == null ? '' : String(actualValue).trim()
+    const expected = expectedValue == null ? '' : String(expectedValue).trim()
+
+    switch (operator) {
+      case 'not_equals':
+        return actual !== expected
+      case 'contains':
+        return expected !== '' && actual.includes(expected)
+      case 'not_contains':
+        return expected === '' || !actual.includes(expected)
+      case 'starts_with':
+        return expected !== '' && actual.startsWith(expected)
+      case 'ends_with':
+        return expected !== '' && actual.endsWith(expected)
+      case 'equals':
+      default:
+        return actual === expected
+    }
+  },
+
+  /**
+   * 內部方法：依插入點尋找符合條件的步驟
+   */
+  async _findMatchingConditionalStep (workflowId, insertOrder, formId, recordId) {
+    if (!workflowId || insertOrder === null || insertOrder === undefined) {
+      return null
+    }
+
+    const { data: steps, error } = await supabase
+      .from('approval_workflow_steps')
+      .select('*')
+      .eq('workflow_id', workflowId)
+      .eq('is_conditional', true)
+      .eq('trigger_insert_order', insertOrder)
+      .order('step_order', { ascending: true })
+
+    if (error || !steps?.length) {
+      return null
+    }
+
+    for (const step of steps) {
+      const fieldValue = await this._getFormFieldValue(formId, recordId, step.trigger_field)
+      if (this._compareTriggerValue(fieldValue, step.trigger_value, step.trigger_operator)) {
+        return step
+      }
+    }
+
+    return null
+  },
+
+  /**
+   * 內部方法：取得一般流程步驟
+   */
+  async _getRegularStepByOrder (workflowId, stepOrder) {
+    if (!workflowId || !stepOrder) {
+      return null
+    }
+
+    const { data } = await supabase
+      .from('approval_workflow_steps')
+      .select('*')
+      .eq('workflow_id', workflowId)
+      .eq('is_conditional', false)
+      .eq('step_order', stepOrder)
+      .maybeSingle()
+
+    return data
+  },
+
+  /**
+   * 內部方法：決定流程起始步驟
+   */
+  async _resolveInitialStep (workflowId, formId, recordId) {
+    const conditionalStep = await this._findMatchingConditionalStep(workflowId, 0, formId, recordId)
+    if (conditionalStep) {
+      return conditionalStep
+    }
+
+    const { data: firstStep } = await supabase
+      .from('approval_workflow_steps')
+      .select('id, status_code, approver_type')
+      .eq('workflow_id', workflowId)
+      .eq('is_conditional', false)
+      .eq('step_order', 1)
+      .maybeSingle()
+
+    return firstStep
+  },
+
+  /**
+   * 內部方法：一般步驟核准後，判斷是否進入條件型分支
+   */
+  async _resolveConditionalNextStep (record, currentStep) {
+    if (currentStep.is_conditional) {
+      return null
+    }
+
+    return this._findMatchingConditionalStep(
+      record.workflow_id,
+      currentStep.step_order,
+      record.form_id,
+      record.record_id
+    )
   },
 
   /**
