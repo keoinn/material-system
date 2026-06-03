@@ -26,11 +26,15 @@ export default {
       query = query.eq('form_id', formId)
     } else {
       // 如果是 form_code，先查詢表單 ID
-      const { data: form } = await supabase
+      const { data: form, error: formError } = await supabase
         .from('forms')
         .select('id')
         .eq('form_code', formId)
-        .single()
+        .maybeSingle()
+
+      if (formError) {
+        throw formError
+      }
 
       if (!form) {
         throw new Error(`找不到表單: ${formId}`)
@@ -82,11 +86,15 @@ export default {
 
     if (!isFormNumeric) {
       // 如果是 form_code，先查詢表單 ID
-      const { data: form } = await supabase
+      const { data: form, error: formError } = await supabase
         .from('forms')
         .select('id')
         .eq('form_code', formId)
-        .single()
+        .maybeSingle()
+
+      if (formError) {
+        throw formError
+      }
 
       if (!form) {
         throw new Error(`找不到表單: ${formId}`)
@@ -104,7 +112,7 @@ export default {
       .select('*')
       .eq('form_id', formIdValue)
       .eq(queryField, fieldIdOrKey)
-      .single()
+      .maybeSingle()
 
     if (error) {
       throw error
@@ -127,11 +135,15 @@ export default {
 
     if (!isNumeric) {
       // 如果是 form_code，先查詢表單 ID
-      const { data: form } = await supabase
+      const { data: form, error: formError } = await supabase
         .from('forms')
         .select('id')
         .eq('form_code', formId)
-        .single()
+        .maybeSingle()
+
+      if (formError) {
+        throw formError
+      }
 
       if (!form) {
         throw new Error(`找不到表單: ${formId}`)
@@ -147,10 +159,14 @@ export default {
         form_id: formIdValue,
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       throw error
+    }
+
+    if (!data) {
+      throw new Error('建立欄位失敗：無法取得新建欄位資料')
     }
 
     return data
@@ -170,11 +186,15 @@ export default {
 
     if (!isNumeric) {
       // 如果是 form_code，先查詢表單 ID
-      const { data: form } = await supabase
+      const { data: form, error: formError } = await supabase
         .from('forms')
         .select('id')
         .eq('form_code', formId)
-        .single()
+        .maybeSingle()
+
+      if (formError) {
+        throw formError
+      }
 
       if (!form) {
         throw new Error(`找不到表單: ${formId}`)
@@ -189,10 +209,14 @@ export default {
       .eq('id', fieldId)
       .eq('form_id', formIdValue)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       throw error
+    }
+
+    if (!data) {
+      throw new Error(`找不到欄位或無法更新（id: ${fieldId}，form_id: ${formIdValue}）`)
     }
 
     return data
@@ -212,11 +236,15 @@ export default {
 
     if (!isNumeric) {
       // 如果是 form_code，先查詢表單 ID
-      const { data: form } = await supabase
+      const { data: form, error: formError } = await supabase
         .from('forms')
         .select('id')
         .eq('form_code', formId)
-        .single()
+        .maybeSingle()
+
+      if (formError) {
+        throw formError
+      }
 
       if (!form) {
         throw new Error(`找不到表單: ${formId}`)
@@ -250,11 +278,15 @@ export default {
 
     if (!isNumeric) {
       // 如果是 form_code，先查詢表單 ID
-      const { data: form } = await supabase
+      const { data: form, error: formError } = await supabase
         .from('forms')
         .select('id')
         .eq('form_code', formId)
-        .single()
+        .maybeSingle()
+
+      if (formError) {
+        throw formError
+      }
 
       if (!form) {
         throw new Error(`找不到表單: ${formId}`)

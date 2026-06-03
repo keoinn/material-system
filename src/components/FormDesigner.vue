@@ -5,6 +5,27 @@
       <v-spacer />
       <div class="d-flex align-center" style="gap: 8px;">
         <v-btn
+          color="primary"
+          :disabled="!canSave"
+          :loading="saving"
+          size="small"
+          variant="outlined"
+          @click="saveFormBasic"
+        >
+          <v-icon start>mdi-content-save</v-icon>
+          儲存基本資訊
+        </v-btn>
+        <v-btn
+          color="primary"
+          :disabled="!canSave"
+          :loading="saving"
+          size="small"
+          @click="saveForm"
+        >
+          <v-icon start>mdi-content-save-all</v-icon>
+          儲存表單
+        </v-btn>
+        <v-btn
           v-if="isEditMode"
           color="primary"
           size="small"
@@ -62,6 +83,10 @@
           <v-icon start>mdi-eye</v-icon>
           預覽
         </v-tab>
+        <v-tab value="json">
+          <v-icon start>mdi-code-json</v-icon>
+          JSON
+        </v-tab>
       </v-tabs>
 
       <v-window v-model="activeTab">
@@ -117,6 +142,32 @@
                   hide-details
                   label="設為預設表單"
                 />
+              </v-col>
+              <v-col cols="12">
+                <div class="d-flex align-center flex-wrap" style="gap: 8px;">
+                  <v-btn
+                    color="primary"
+                    :disabled="!canSave"
+                    :loading="saving"
+                    @click="saveFormBasic"
+                  >
+                    <v-icon start>mdi-content-save</v-icon>
+                    儲存基本資訊
+                  </v-btn>
+                  <v-btn
+                    color="primary"
+                    :disabled="!canSave"
+                    :loading="saving"
+                    variant="outlined"
+                    @click="saveForm"
+                  >
+                    <v-icon start>mdi-content-save-all</v-icon>
+                    儲存完整表單
+                  </v-btn>
+                  <span class="text-caption text-medium-emphasis">
+                    「儲存基本資訊」僅更新表單名稱與設定；「儲存完整表單」會一併儲存所有欄位（需至少一個欄位）
+                  </span>
+                </div>
               </v-col>
             </v-row>
           </v-form>
@@ -654,6 +705,78 @@
                   </v-row>
                 </div>
               </v-form>
+            </v-card-text>
+          </v-card>
+        </v-window-item>
+
+        <!-- JSON -->
+        <v-window-item value="json">
+          <v-card variant="outlined">
+            <v-card-title class="d-flex align-center text-subtitle-1 py-3">
+              <span>表單設定（JSON）</span>
+              <v-spacer />
+              <v-btn
+                class="mr-2"
+                prepend-icon="mdi-format-align-left"
+                size="small"
+                variant="text"
+                @click="formatFormSettingsJsonDraft"
+              >
+                格式化
+              </v-btn>
+              <v-btn
+                class="mr-2"
+                color="primary"
+                prepend-icon="mdi-content-copy"
+                size="small"
+                variant="tonal"
+                @click="copyFormSettingsJson"
+              >
+                複製
+              </v-btn>
+              <v-btn
+                class="mr-2"
+                size="small"
+                variant="outlined"
+                @click="revertFormSettingsJson"
+              >
+                還原
+              </v-btn>
+              <v-btn
+                color="primary"
+                :disabled="formSettingsJsonDraftError"
+                size="small"
+                variant="flat"
+                @click="applyFormSettingsJson"
+              >
+                套用
+              </v-btn>
+            </v-card-title>
+            <v-card-text>
+              <div
+                class="json-editor-pane form-settings-json-pane"
+                :class="{ 'json-editor-pane--error': formSettingsJsonDraftError }"
+              >
+                <JsonCodeEditor v-model="formSettingsJsonDraft" />
+              </div>
+              <div
+                v-if="formSettingsJsonDraftError"
+                class="text-error text-caption mt-2"
+              >
+                JSON 格式錯誤，請檢查語法
+              </div>
+              <div class="text-caption text-medium-emphasis mt-2">
+                可拖曳編輯區右下角調整高度；編輯完成後請按「套用」同步至表單設定
+              </div>
+              <v-alert
+                class="mt-4"
+                type="info"
+                variant="tonal"
+              >
+                <div class="text-body-2">
+                  可手動調整表單基本資訊、群組順序、子群組與欄位設定；套用後會同步更新各分頁內容。
+                </div>
+              </v-alert>
             </v-card-text>
           </v-card>
         </v-window-item>
@@ -2525,6 +2648,7 @@
     jsonEditorTextareaResizeObserver?.disconnect()
     jsonEditorTextareaResizeObserver = null
   }
+
   const editingFieldIndex = ref(null)
   const floatingWindowVisible = ref(false) // 懸浮視窗顯示狀態
   const fieldsHeaderRef = ref(null) // 原始功能列的引用
@@ -2535,6 +2659,185 @@
   const previewFieldLoading = reactive({}) // 預覽時欄位載入狀態
 
   const isEditMode = computed(() => !!props.formId)
+
+  function buildSubGroupsData () {
+    const subGroupsData = {}
+    if (subGroups.value && subGroups.value.size > 0) {
+      for (const [groupName, subGroupsList] of subGroups.value.entries()) {
+        if (subGroupsList && subGroupsList.length > 0) {
+          subGroupsData[groupName] = subGroupsList.map(sg => ({
+            name: sg.name,
+            order: sg.order || 0,
+          }))
+        }
+      }
+    }
+    return subGroupsData
+  }
+
+  function buildFieldPayload (field, index) {
+    return {
+      ...(field.id ? { id: field.id } : {}),
+      field_key: field.field_key,
+      field_label: field.field_label,
+      field_label_en: field.field_label_en || '',
+      field_type: field.field_type,
+      max_length: field.max_length ?? null,
+      is_required: field.is_required || false,
+      field_group: field.field_group || '',
+      sub_group: field.sub_group || '',
+      display_order: field.display_order || (index + 1),
+      field_config: field.field_config || {},
+      default_value: field.default_value || '',
+      placeholder: field.placeholder || '',
+      help_text: field.help_text || '',
+      validation_rules: field.validation_rules || {},
+      is_visible: field.is_visible !== false,
+      is_readonly: field.is_readonly || false,
+      is_in_template: field.is_in_template || false,
+    }
+  }
+
+  const formSettingsSnapshot = computed(() => {
+    const formConfig = {
+      ...formData.form_config,
+      group_order: [...groupOrder.value],
+      sub_groups: buildSubGroupsData(),
+    }
+
+    return {
+      form_code: formData.form_code,
+      form_name: formData.form_name,
+      form_name_en: formData.form_name_en || '',
+      description: formData.description || '',
+      is_active: formData.is_active !== false,
+      is_default: formData.is_default || false,
+      form_config: formConfig,
+      fields: fields.value.map((field, index) => buildFieldPayload(field, index)),
+    }
+  })
+
+  const formSettingsJsonText = computed(() =>
+    JSON.stringify(formSettingsSnapshot.value, null, 2),
+  )
+
+  const formSettingsJsonDraft = ref('')
+  const formSettingsJsonDraftError = ref(false)
+
+  function syncFormSettingsJsonDraft () {
+    formSettingsJsonDraft.value = formSettingsJsonText.value
+    formSettingsJsonDraftError.value = false
+  }
+
+  async function copyFormSettingsJson () {
+    try {
+      await navigator.clipboard.writeText(formSettingsJsonDraft.value || formSettingsJsonText.value)
+      await swal.success('已複製到剪貼簿')
+    } catch (error) {
+      console.error('複製 JSON 失敗', error)
+      await swal.error('複製失敗')
+    }
+  }
+
+  function validateFormSettingsJsonDraft () {
+    if (!formSettingsJsonDraft.value || formSettingsJsonDraft.value.trim() === '') {
+      formSettingsJsonDraftError.value = false
+      return true
+    }
+
+    try {
+      JSON.parse(formSettingsJsonDraft.value)
+      formSettingsJsonDraftError.value = false
+      return true
+    } catch {
+      formSettingsJsonDraftError.value = true
+      return false
+    }
+  }
+
+  function revertFormSettingsJson () {
+    syncFormSettingsJsonDraft()
+  }
+
+  function formatFormSettingsJsonDraft () {
+    if (!validateFormSettingsJsonDraft()) {
+      return
+    }
+
+    try {
+      formSettingsJsonDraft.value = JSON.stringify(
+        JSON.parse(formSettingsJsonDraft.value || '{}'),
+        null,
+        2,
+      )
+    } catch {
+      formSettingsJsonDraftError.value = true
+    }
+  }
+
+  function applyFormSettingsFromJson (parsed) {
+    if (!isEditMode.value && parsed.form_code !== undefined) {
+      formData.form_code = parsed.form_code
+    }
+    if (parsed.form_name !== undefined) {
+      formData.form_name = parsed.form_name
+    }
+    if (parsed.form_name_en !== undefined) {
+      formData.form_name_en = parsed.form_name_en || ''
+    }
+    if (parsed.description !== undefined) {
+      formData.description = parsed.description || ''
+    }
+    if (parsed.is_active !== undefined) {
+      formData.is_active = parsed.is_active !== false
+    }
+    if (parsed.is_default !== undefined) {
+      formData.is_default = parsed.is_default || false
+    }
+
+    if (parsed.form_config && typeof parsed.form_config === 'object') {
+      const { group_order, sub_groups, ...restConfig } = parsed.form_config
+      formData.form_config = { ...restConfig }
+
+      if (Array.isArray(group_order)) {
+        groupOrder.value = [...group_order]
+      }
+
+      if (sub_groups && typeof sub_groups === 'object') {
+        subGroups.value = new Map(Object.entries(sub_groups).map(([groupName, subGroupsList]) => {
+          return [groupName, (Array.isArray(subGroupsList) ? subGroupsList : []).map((sg, index) => ({
+            name: typeof sg === 'string' ? sg : sg.name,
+            order: typeof sg === 'string' ? index : (sg.order || index),
+          }))]
+        }))
+      }
+    }
+
+    if (Array.isArray(parsed.fields)) {
+      fields.value = parsed.fields.map(field => ({ ...field }))
+
+      allGroups.value = new Set()
+      for (const field of fields.value) {
+        if (field.field_group) {
+          allGroups.value.add(field.field_group)
+        }
+      }
+    }
+  }
+
+  function applyFormSettingsJson () {
+    if (!validateFormSettingsJsonDraft()) {
+      return
+    }
+
+    try {
+      const parsed = JSON.parse(formSettingsJsonDraft.value || '{}')
+      applyFormSettingsFromJson(parsed)
+      syncFormSettingsJsonDraft()
+    } catch {
+      formSettingsJsonDraftError.value = true
+    }
+  }
 
   const formData = reactive({
     form_code: '',
@@ -4928,6 +5231,93 @@
     return colors[type] || 'grey'
   }
 
+  function resolveFieldIdForSave (field, existingFields) {
+    const byKey = existingFields.find(ef => ef.field_key === field.field_key)
+    if (byKey) {
+      return byKey.id
+    }
+
+    if (field.id) {
+      const byId = existingFields.find(ef => ef.id === field.id)
+      if (byId) {
+        return byId.id
+      }
+    }
+
+    return null
+  }
+
+  function buildFormConfigForSave () {
+    const formConfig = { ...formData.form_config, group_order: groupOrder.value }
+    const subGroupsData = {}
+    if (subGroups.value && subGroups.value.size > 0) {
+      for (const [groupName, subGroupsList] of subGroups.value.entries()) {
+        if (subGroupsList && subGroupsList.length > 0) {
+          subGroupsData[groupName] = subGroupsList.map(sg => ({
+            name: sg.name,
+            order: sg.order || 0,
+          }))
+        }
+      }
+    }
+    formConfig.sub_groups = subGroupsData
+    return formConfig
+  }
+
+  // 僅儲存基本資訊（不更新欄位）
+  async function saveFormBasic () {
+    const { valid } = await basicFormRef.value.validate()
+    if (!valid) {
+      await swal.warning('請填寫所有必填欄位')
+      return
+    }
+
+    saving.value = true
+    saveProgress.value = 0
+
+    try {
+      let formId
+      const formConfig = buildFormConfigForSave()
+
+      if (isEditMode.value) {
+        saveProgress.value = 50
+        const updatedForm = await formsService.updateForm(props.formId, {
+          form_name: formData.form_name,
+          form_name_en: formData.form_name_en,
+          description: formData.description,
+          is_active: formData.is_active,
+          is_default: formData.is_default,
+          form_config: formConfig,
+        })
+        formId = updatedForm.id
+      } else {
+        saveProgress.value = 50
+        const newForm = await formsService.createForm({
+          form_code: formData.form_code,
+          form_name: formData.form_name,
+          form_name_en: formData.form_name_en || '',
+          description: formData.description || '',
+          is_active: formData.is_active !== false,
+          is_default: formData.is_default || false,
+          form_config: formConfig,
+        })
+        formId = newForm.id
+      }
+
+      saveProgress.value = 100
+      await new Promise(resolve => setTimeout(resolve, 300))
+      saving.value = false
+      saveProgress.value = 0
+      await swal.success('基本資訊已儲存')
+      emit('saved', formId)
+    } catch (error) {
+      console.error('儲存基本資訊失敗', error)
+      saving.value = false
+      saveProgress.value = 0
+      await swal.error(error.message || '儲存基本資訊失敗')
+    }
+  }
+
   // 儲存表單
   async function saveForm () {
     const { valid } = await basicFormRef.value.validate()
@@ -4954,21 +5344,8 @@
 
         // 更新表單（包含群組順序和子群組）
         saveProgress.value = 5
-        const formConfig = { ...formData.form_config, group_order: groupOrder.value }
-        // 保存子群組資料
-        const subGroupsData = {}
-        if (subGroups.value && subGroups.value.size > 0) {
-          for (const [groupName, subGroupsList] of subGroups.value.entries()) {
-            if (subGroupsList && subGroupsList.length > 0) {
-              subGroupsData[groupName] = subGroupsList.map(sg => ({
-                name: sg.name,
-                order: sg.order || 0,
-              }))
-            }
-          }
-        }
-        formConfig.sub_groups = subGroupsData
-        console.log('保存子群組資料:', subGroupsData)
+        const formConfig = buildFormConfigForSave()
+        console.log('保存子群組資料:', formConfig.sub_groups)
 
         saveProgress.value = 10
         const updatedForm = await formsService.updateForm(props.formId, {
@@ -5025,15 +5402,12 @@
             is_in_template: field.is_in_template || false,
           }
 
-          // 確定欄位 ID：優先使用欄位的 id，如果沒有則從 existingFields 中查找
-          let fieldId = field.id
-          if (!fieldId) {
-            const existingField = existingFields.find(ef => ef.field_key === field.field_key)
-            if (existingField) {
-              fieldId = existingField.id
-              // 更新本地欄位的 id，以便後續操作
-              field.id = fieldId
-            }
+          // 以 field_key 對應資料庫欄位，避免 JSON 匯入的過期 id 導致更新失敗
+          const fieldId = resolveFieldIdForSave(field, existingFields)
+          if (fieldId) {
+            field.id = fieldId
+          } else {
+            delete field.id
           }
 
           if (fieldId) {
@@ -5058,16 +5432,7 @@
 
         // 建立新表單（包含群組順序和子群組）
         saveProgress.value = 5
-        const formConfig = { ...formData.form_config, group_order: groupOrder.value }
-        // 保存子群組資料
-        const subGroupsData = {}
-        for (const [groupName, subGroupsList] of subGroups.value.entries()) {
-          subGroupsData[groupName] = subGroupsList.map(sg => ({
-            name: sg.name,
-            order: sg.order || 0,
-          }))
-        }
-        formConfig.sub_groups = subGroupsData
+        const formConfig = buildFormConfigForSave()
 
         saveProgress.value = 10
         const newForm = await formsService.createForm({
@@ -5441,6 +5806,12 @@
     }
   })
 
+  watch(() => formSettingsJsonDraft.value, () => {
+    if (activeTab.value === 'json') {
+      validateFormSettingsJsonDraft()
+    }
+  })
+
   // 切換懸浮視窗（手動切換時清除自動顯示標記）
   function toggleFloatingWindow () {
     isAutoShowingFloatingWindow.value = false
@@ -5516,6 +5887,10 @@
         floatingWindowVisible.value = false
         isAutoShowingFloatingWindow.value = false
       }
+    }
+
+    if (newTab === 'json') {
+      syncFormSettingsJsonDraft()
     }
   })
 </script>
@@ -5930,6 +6305,12 @@
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-radius: 4px;
   background: #fafafa;
+}
+
+.form-settings-json-pane {
+  min-height: 360px;
+  height: calc(100vh - 320px);
+  max-height: calc(100vh - 200px);
 }
 
 .json-editor-pane--error {

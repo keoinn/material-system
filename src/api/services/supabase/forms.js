@@ -107,10 +107,14 @@ export default {
       .from('forms')
       .insert(formData)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       throw error
+    }
+
+    if (!data) {
+      throw new Error('建立表單失敗：無法取得新建表單資料')
     }
 
     return data
@@ -137,10 +141,14 @@ export default {
       .update(updates)
       .eq('id', id)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       throw error
+    }
+
+    if (!data) {
+      throw new Error(`找不到表單或無法更新（id: ${id}）`)
     }
 
     return data

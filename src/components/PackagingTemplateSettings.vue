@@ -11,7 +11,17 @@
         type="warning"
         variant="tonal"
       >
-        尚未設定預設表單，請先到「表單管理」設定預設表單。
+        <div class="d-flex align-center flex-wrap ga-2">
+          <span>尚未設定預設表單，請先到「表單管理」勾選「設為預設表單」並儲存。</span>
+          <v-btn
+            color="warning"
+            size="small"
+            variant="outlined"
+            @click="loadDefaultForm"
+          >
+            重新載入
+          </v-btn>
+        </div>
       </v-alert>
 
       <v-progress-linear
@@ -222,11 +232,13 @@
 </template>
 
 <script setup>
-  import { computed, onMounted, reactive, ref } from 'vue'
+  import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+  import { useRoute } from 'vue-router'
   import { formFieldsService } from '@/api/services/formFields'
   import { formsService } from '@/api/services/forms'
   import { packagingService } from '@/api/services/packaging'
   import { useSwal } from '@/composables/useSwal'
+  import { FORMS_UPDATED_EVENT, resolveDefaultFormId } from '@/utils/resolveDefaultForm'
   import AggregatedField from './form-fields/AggregatedField.vue'
   import CascadingSelectField from './form-fields/CascadingSelectField.vue'
   import CascadingSelectLevel from './form-fields/CascadingSelectLevel.vue'
@@ -244,6 +256,7 @@
   import ImageUrlField from './form-fields/ImageUrlField.vue'
   import UrlField from './form-fields/UrlField.vue'
 
+  const route = useRoute()
   const swal = useSwal()
 
   const loading = ref(false)
@@ -397,23 +410,14 @@
   async function loadDefaultForm () {
     loading.value = true
     try {
-      const defaultForms = await formsService.getForms({ is_default: true, is_active: true })
-      if (defaultForms && defaultForms.length > 0) {
-        defaultFormId.value = defaultForms[0].id
+      const formId = await resolveDefaultFormId()
+      defaultFormId.value = formId
+      if (formId) {
         await loadTemplateFields()
-      } else {
-        try {
-          const materialForm = await formsService.getForm('material_application', false)
-          if (materialForm && materialForm.is_active) {
-            defaultFormId.value = materialForm.id
-            await loadTemplateFields()
-          }
-        } catch (error) {
-          console.error('載入 material_application 表單失敗', error)
-        }
       }
     } catch (error) {
       console.error('載入預設表單失敗', error)
+      defaultFormId.value = null
       await swal.error('載入表單定義失敗，請稍後再試')
     } finally {
       loading.value = false
@@ -686,6 +690,17 @@
 
   onMounted(() => {
     loadDefaultForm()
+    window.addEventListener(FORMS_UPDATED_EVENT, loadDefaultForm)
+  })
+
+  onUnmounted(() => {
+    window.removeEventListener(FORMS_UPDATED_EVENT, loadDefaultForm)
+  })
+
+  watch(() => route.query.tab, tab => {
+    if (tab === 'packaging') {
+      loadDefaultForm()
+    }
   })
 </script>
 

@@ -319,11 +319,15 @@ export default {
 
     if (!isNumeric) {
       // 如果是 form_code，先查詢表單 ID
-      const { data: form } = await supabase
+      const { data: form, error: formError } = await supabase
         .from('forms')
         .select('id')
         .eq('form_code', formId)
-        .single()
+        .maybeSingle()
+
+      if (formError) {
+        throw formError
+      }
 
       if (!form) {
         throw new Error(`找不到表單: ${formId}`)
@@ -368,11 +372,15 @@ export default {
 
     if (!isNumeric) {
       // 如果是 form_code，先查詢表單 ID
-      const { data: form } = await supabase
+      const { data: form, error: formError } = await supabase
         .from('forms')
         .select('id')
         .eq('form_code', formId)
-        .single()
+        .maybeSingle()
+
+      if (formError) {
+        throw formError
+      }
 
       if (!form) {
         throw new Error(`找不到表單: ${formId}`)
@@ -406,10 +414,13 @@ export default {
         .update(templateData)
         .eq('id', existing.id)
         .select()
-        .single()
+        .maybeSingle()
 
       data = updated
       error = updateError
+      if (!error && !data) {
+        error = new Error(`找不到包裝模板或無法更新（id: ${existing.id}）`)
+      }
     } else {
       // 建立新記錄
       templateData.created_by_id = userId
@@ -417,10 +428,13 @@ export default {
         .from('packaging_templates')
         .insert(templateData)
         .select()
-        .single()
+        .maybeSingle()
 
       data = created
       error = createError
+      if (!error && !data) {
+        error = new Error('建立包裝模板失敗：無法取得新建資料')
+      }
     }
 
     if (error) {

@@ -278,14 +278,15 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { formDataService } from '@/api/services/formData'
-import { formsService } from '@/api/services/forms'
 import { useSwal } from '@/composables/useSwal'
+import { FORMS_UPDATED_EVENT, resolveDefaultFormId } from '@/utils/resolveDefaultForm'
 import { useBatchMaterialApplicationsStore } from '@/stores/batchMaterialApplications'
 import DynamicFormRenderer from './DynamicFormRenderer.vue'
 
+const route = useRoute()
 const router = useRouter()
 const swal = useSwal()
 const batchStore = useBatchMaterialApplicationsStore()
@@ -321,17 +322,10 @@ const visibleDrafts = computed(() => {
 async function loadDefaultForm () {
   loadingDefaultForm.value = true
   try {
-    const defaultForms = await formsService.getForms({ is_default: true, is_active: true })
-    if (defaultForms?.length > 0) {
-      defaultFormId.value = defaultForms[0].id
-      return
-    }
-    const materialForm = await formsService.getForm('material_application', false)
-    if (materialForm?.is_active) {
-      defaultFormId.value = materialForm.id
-    }
+    defaultFormId.value = await resolveDefaultFormId()
   } catch (error) {
     console.error('載入預設表單失敗', error)
+    defaultFormId.value = null
     await swal.error('載入表單定義失敗，請稍後再試')
   } finally {
     loadingDefaultForm.value = false
@@ -496,6 +490,17 @@ function formatDate (date) {
 
 onMounted(async () => {
   await loadDefaultForm()
+  window.addEventListener(FORMS_UPDATED_EVENT, loadDefaultForm)
+})
+
+onUnmounted(() => {
+  window.removeEventListener(FORMS_UPDATED_EVENT, loadDefaultForm)
+})
+
+watch(() => route.query.tab, tab => {
+  if (tab === 'batch-apply') {
+    loadDefaultForm()
+  }
 })
 </script>
 

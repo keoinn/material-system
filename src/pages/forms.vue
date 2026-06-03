@@ -116,6 +116,7 @@ import { onMounted, ref } from 'vue'
 import { formsService } from '@/api/services/forms'
 import { useSwal } from '@/composables/useSwal'
 import FormDesigner from '@/components/FormDesigner.vue'
+import { notifyFormsUpdated } from '@/utils/resolveDefaultForm'
 
 const swal = useSwal()
 
@@ -156,6 +157,7 @@ function openDesigner (formId) {
 async function handleFormSaved (formId) {
   // 儲存成功後不關閉對話視窗，只更新表單列表
   await loadForms()
+  notifyFormsUpdated()
   // 如果是新建表單，更新 editingFormId 以便後續編輯
   if (!editingFormId.value && formId) {
     editingFormId.value = formId
@@ -186,6 +188,7 @@ async function deleteForm (formId) {
     await formsService.deleteForm(formId)
     await swal.success('表單已刪除')
     await loadForms()
+    notifyFormsUpdated()
   } catch (error) {
     console.error('刪除表單失敗', error)
     await swal.error('刪除表單失敗')
