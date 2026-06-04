@@ -428,6 +428,10 @@
    */
   function navigateToModule (moduleTab) {
     tab.value = moduleTab
+    if (moduleTab === 'batch-apply') {
+      router.push({ path: '/', query: { tab: moduleTab, batchView: 'select' } })
+      return
+    }
     router.push({ path: '/', query: { tab: moduleTab } })
   }
 
@@ -474,6 +478,7 @@
             if (canApply.value) {
               e.preventDefault()
               tab.value = 'batch-apply'
+              router.push({ path: '/', query: { tab: 'batch-apply', batchView: 'select' } })
             }
             break
           }

@@ -122,15 +122,16 @@
           <v-card-text class="pa-0">
             <v-container>
               <v-card
-                class="mb-4"
+                class="mb-4 basic-info-card"
+                density="compact"
                 variant="outlined"
               >
-                <v-card-title class="text-subtitle-1 bg-grey-lighten-4">
+                <v-card-title class="text-subtitle-1 bg-grey-lighten-4 basic-info-card__title">
                   <v-icon class="mr-2">mdi-information</v-icon>
                   基本資訊
                 </v-card-title>
-                <v-card-text>
-                  <v-row>
+                <v-card-text class="basic-info-card__content">
+                  <v-row class="basic-info-grid" dense>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">申請單號：</span>
@@ -181,6 +182,16 @@
                         <span class="detail-value">{{ formatDate(selectedApplication.submit_date) }}</span>
                       </div>
                     </v-col>
+                    <v-col
+                      v-if="selectedApplication.workflow_name || selectedApplication.workflow_code"
+                      cols="12"
+                      md="6"
+                    >
+                      <div class="detail-item">
+                        <span class="detail-label">審核流程：</span>
+                        <span class="detail-value">{{ formatWorkflowName(selectedApplication) }}</span>
+                      </div>
+                    </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">狀態：</span>
@@ -194,6 +205,15 @@
                       </div>
                     </v-col>
                     <v-col
+                      v-if="isReturnedStatus(selectedApplication)"
+                      cols="12"
+                    >
+                      <div class="detail-item detail-item--reject-reason">
+                        <span class="detail-label">退回原因：</span>
+                        <span class="detail-value text-error">{{ selectedApplication.reject_reason || '無' }}</span>
+                      </div>
+                    </v-col>
+                    <v-col
                       v-if="selectedApplication.current_step_name"
                       cols="12"
                       md="6"
@@ -201,16 +221,6 @@
                       <div class="detail-item">
                         <span class="detail-label">當前步驟：</span>
                         <span class="detail-value">{{ selectedApplication.current_step_name }}</span>
-                      </div>
-                    </v-col>
-                    <v-col
-                      v-if="selectedApplication.workflow_name"
-                      cols="12"
-                      md="6"
-                    >
-                      <div class="detail-item">
-                        <span class="detail-label">審核流程：</span>
-                        <span class="detail-value">{{ selectedApplication.workflow_name }}</span>
                       </div>
                     </v-col>
                   </v-row>
@@ -307,6 +317,24 @@ const headers = [
 function formatDate (dateString) {
   if (!dateString) return ''
   return new Date(dateString).toLocaleDateString('zh-TW')
+}
+
+function formatWorkflowName (application) {
+  if (!application) return 'N/A'
+  if (application.workflow_name && application.workflow_code) {
+    return `${application.workflow_name} (${application.workflow_code})`
+  }
+  return application.workflow_name || application.workflow_code || 'N/A'
+}
+
+function isReturnedStatus (application) {
+  if (!application) return false
+  const statusCode = application.current_status_code || application.status
+  if (statusCode === 'REJECTED' || statusCode === 'RETURNED') {
+    return true
+  }
+  const statusName = application.current_status_name || getStatusText(statusCode)
+  return typeof statusName === 'string' && statusName.includes('退回')
 }
 
 // 從審核流程狀態定義獲取顏色
@@ -431,6 +459,42 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+.basic-info-card {
+  &__title {
+    padding-top: 8px;
+    padding-bottom: 8px;
+    min-height: unset;
+  }
+
+  &__content {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+
+  .detail-item {
+    padding: 2px 0;
+    min-height: 28px;
+    line-height: 1.35;
+  }
+
+  .detail-label {
+    min-width: 88px;
+    margin-right: 6px;
+    font-size: 0.875rem;
+  }
+
+  .detail-value {
+    font-size: 0.875rem;
+  }
+}
+
+.basic-info-grid {
+  > .v-col {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+}
+
 .detail-label {
   font-weight: 600;
   color: rgba(0, 0, 0, 0.6);
@@ -441,5 +505,14 @@ onMounted(() => {
 .detail-value {
   color: rgba(0, 0, 0, 0.87);
   flex: 1;
+}
+
+.detail-item--reject-reason {
+  align-items: flex-start;
+
+  .detail-value {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
 }
 </style>

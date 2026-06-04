@@ -44,12 +44,16 @@ export const useBatchMaterialApplicationsStore = defineStore('batchMaterialAppli
     }
   }
 
-  function createDraft () {
+  function createDraft ({ formId = null, formName = '', formCode = '' } = {}) {
+    const label = formName || '申請'
     const newDraft = {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      name: `物料申請草稿 ${String(counter.value).padStart(2, '0')}`,
+      name: `${label}草稿 ${String(counter.value).padStart(2, '0')}`,
       status: 'draft',
       recordId: null,
+      formId,
+      formName,
+      formCode,
       values: {},
       updatedAt: new Date().toISOString(),
     }
@@ -66,9 +70,12 @@ export const useBatchMaterialApplicationsStore = defineStore('batchMaterialAppli
 
     const clonedDraft = {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      name: `物料申請草稿 ${String(counter.value).padStart(2, '0')}`,
+      name: `${source.formName || '申請'}草稿 ${String(counter.value).padStart(2, '0')}`,
       status: 'draft',
       recordId: null,
+      formId: source.formId ?? null,
+      formName: source.formName || '',
+      formCode: source.formCode || '',
       values: JSON.parse(JSON.stringify(source.values || {})),
       updatedAt: new Date().toISOString(),
     }

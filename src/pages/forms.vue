@@ -39,17 +39,6 @@
               </v-chip>
             </template>
 
-            <template #item.is_default="{ item }">
-              <v-chip
-                v-if="item.is_default"
-                color="primary"
-                size="small"
-                variant="flat"
-              >
-                預設
-              </v-chip>
-            </template>
-
             <template #item.created_at="{ item }">
               {{ formatDate(item.created_at) }}
             </template>
@@ -116,7 +105,7 @@ import { onMounted, ref } from 'vue'
 import { formsService } from '@/api/services/forms'
 import { useSwal } from '@/composables/useSwal'
 import FormDesigner from '@/components/FormDesigner.vue'
-import { notifyFormsUpdated } from '@/utils/resolveDefaultForm'
+import { notifyFormsUpdated } from '@/utils/formsUpdatedEvent'
 
 const swal = useSwal()
 
@@ -129,7 +118,6 @@ const headers = [
   { title: '表單代碼', key: 'form_code', sortable: true },
   { title: '表單名稱', key: 'form_name', sortable: true },
   { title: '狀態', key: 'is_active', sortable: true },
-  { title: '預設', key: 'is_default', sortable: true },
   { title: '建立時間', key: 'created_at', sortable: true },
   { title: '操作', key: 'actions', sortable: false },
 ]

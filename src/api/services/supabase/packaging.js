@@ -445,6 +445,47 @@ export default {
   },
 
   /**
+   * 刪除指定表單的所有包裝說明模板
+   * @param {number|string} formId - 表單 ID 或 form_code
+   * @returns {Promise<void>}
+   */
+  async deleteAllPackagingTemplatesForForm (formId) {
+    if (!isSupabaseAvailable()) {
+      throw new Error('Supabase 客戶端未初始化')
+    }
+
+    const isNumeric = /^\d+$/.test(String(formId))
+    let actualFormId = formId
+
+    if (!isNumeric) {
+      const { data: form, error: formError } = await supabase
+        .from('forms')
+        .select('id')
+        .eq('form_code', formId)
+        .maybeSingle()
+
+      if (formError) {
+        throw formError
+      }
+
+      if (!form) {
+        throw new Error(`找不到表單: ${formId}`)
+      }
+
+      actualFormId = form.id
+    }
+
+    const { error } = await supabase
+      .from('packaging_templates')
+      .delete()
+      .eq('form_id', actualFormId)
+
+    if (error) {
+      throw error
+    }
+  },
+
+  /**
    * 刪除類別預設包裝模板
    * @param {string} mainCategoryCode - 產品大類代碼
    * @returns {Promise<void>}

@@ -1,136 +1,216 @@
 <template>
   <v-card>
-    <v-card-title class="d-flex align-center">
-      <div class="text-h6">項目主檔申請表</div>
+    <v-card-title class="d-flex align-center flex-wrap ga-2">
+      <div>
+        <div class="text-h6">項目主檔申請表</div>
+        <div
+          v-if="currentStep === 2 && selectedForm"
+          class="text-caption text-medium-emphasis"
+        >
+          {{ selectedForm.form_name }}
+        </div>
+      </div>
       <v-spacer />
       <v-btn
+        v-if="currentStep === 2"
         class="mr-2"
-        color="primary"
-        prepend-icon="mdi-plus"
-        @click="createDraft"
+        prepend-icon="mdi-arrow-left"
+        variant="outlined"
+        @click="goToFormSelection"
       >
-        新增草稿
+        選擇表單
       </v-btn>
-      <v-btn
-        color="success"
-        prepend-icon="mdi-send"
-        :disabled="loadingDefaultForm || batchSubmitting || selectedDraftIds.length === 0"
-        :loading="batchSubmitting"
-        @click="submitAllDrafts"
-      >
-        送出已選取草稿
-      </v-btn>
+      <template v-if="currentStep === 2">
+        <v-btn
+          class="mr-2"
+          color="primary"
+          prepend-icon="mdi-plus"
+          @click="createDraft"
+        >
+          新增草稿
+        </v-btn>
+        <v-btn
+          color="success"
+          prepend-icon="mdi-send"
+          :disabled="batchSubmitting || selectedDraftIds.length === 0"
+          :loading="batchSubmitting"
+          @click="submitAllDrafts"
+        >
+          送出已選取草稿
+        </v-btn>
+      </template>
     </v-card-title>
 
     <v-card-text>
-      <v-row class="mb-4">
-        <v-col cols="12" md="4">
-          <v-text-field
-            v-model="searchKeyword"
-            clearable
-            label="搜尋草稿名稱"
-            prepend-inner-icon="mdi-magnify"
-            variant="outlined"
-            density="comfortable"
-            @click:clear="searchKeyword = ''"
-          />
-        </v-col>
-      </v-row>
-      <v-data-table
-        v-model="selectedDraftIds"
-        :headers="headers"
-        :items="visibleDrafts"
-        item-value="id"
-        :items-per-page="5"
-        class="elevation-1"
-        show-select
-      >
-        <template v-slot:[`item.name`]="{ item }">
-          <div class="d-flex align-center" style="gap: 6px;">
-            <span>{{ item.name }}</span>
-            <v-btn
-              icon
-              size="x-small"
-              color="primary"
-              variant="text"
-              :title="`修改名稱 ${item.name}`"
-              @click="openRenameDialog(item)"
-            >
-              <v-icon>mdi-pencil-outline</v-icon>
-            </v-btn>
-          </div>
-        </template>
+      <v-progress-linear
+        v-if="loadingForms"
+        class="mb-4"
+        color="primary"
+        indeterminate
+      />
 
-        <template v-slot:[`item.status`]="{ item }">
-          <v-chip
-            :color="item.status === 'submitted' ? 'success' : 'warning'"
-            size="small"
-            variant="flat"
+      <v-window v-model="currentStep">
+        <!-- 第一頁：選擇啟用中的表單 -->
+        <v-window-item :value="1">
+          <p class="text-body-2 text-medium-emphasis mb-4">
+            請選擇要申請的表單（僅顯示啟用中的表單）
+          </p>
+
+          <v-alert
+            v-if="!loadingForms && activeForms.length === 0"
+            type="warning"
+            variant="tonal"
           >
-            {{ item.status === 'submitted' ? '已送出' : '草稿' }}
-          </v-chip>
-        </template>
+            目前沒有啟用中的表單，請先到「表單管理」建立或啟用表單。
+          </v-alert>
 
-        <template v-slot:[`item.recordId`]="{ item }">
-          {{ item.recordId || '-' }}
-        </template>
+          <v-row v-else>
+            <v-col
+              v-for="form in activeForms"
+              :key="form.id"
+              cols="12"
+              sm="6"
+              md="4"
+              lg="3"
+            >
+              <v-btn
+                block
+                class="form-select-btn"
+                color="primary"
+                height="auto"
+                :loading="loadingForms"
+                variant="outlined"
+                @click="selectForm(form)"
+              >
+                <div class="form-select-btn__content py-4">
+                  <v-icon class="mb-2" size="32">mdi-file-document-outline</v-icon>
+                  <div class="text-subtitle-1 font-weight-medium">
+                    {{ form.form_name }}
+                  </div>
+                  <div class="text-caption text-medium-emphasis form-select-btn__en">
+                    {{ form.form_name_en || '\u00a0' }}
+                  </div>
+                  <div class="text-caption mt-1">
+                    {{ form.form_code }}
+                  </div>
+                </div>
+              </v-btn>
+            </v-col>
+          </v-row>
+        </v-window-item>
 
-        <template v-slot:[`item.updatedAt`]="{ item }">
-          {{ formatDate(item.updatedAt) }}
-        </template>
+        <!-- 第二頁：草稿搜尋與管理 -->
+        <v-window-item :value="2">
+          <v-row class="mb-4">
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model="searchKeyword"
+                clearable
+                label="搜尋草稿名稱"
+                prepend-inner-icon="mdi-magnify"
+                variant="outlined"
+                density="comfortable"
+                @click:clear="searchKeyword = ''"
+              />
+            </v-col>
+          </v-row>
 
-        <template v-slot:[`item.actions`]="{ item }">
-          <div class="d-flex align-center" style="gap: 8px;">
-            <v-btn
-              icon
-              size="x-small"
-              color="info"
-              variant="elevated"
-              :disabled="loadingDefaultForm || !defaultFormId"
-              :title="`預覽 ${item.name}`"
-              @click="openPreview(item)"
-            >
-              <v-icon>mdi-eye</v-icon>
-            </v-btn>
-            <v-btn
-              icon
-              size="x-small"
-              color="primary"
-              variant="elevated"
-              :title="`編輯 ${item.name}`"
-              @click="openForm(item)"
-            >
-              <v-icon>mdi-pencil</v-icon>
-            </v-btn>
-            <v-btn
-              icon
-              size="x-small"
-              color="info"
-              variant="elevated"
-              :title="`複製 ${item.name}`"
-              @click="duplicateDraft(item)"
-            >
-              <v-icon>mdi-content-copy</v-icon>
-            </v-btn>
-            <v-btn
-              v-if="item.status !== 'submitted'"
-              icon
-              size="x-small"
-              color="error"
-              variant="elevated"
-              @click="removeDraft(item)"
-            >
-              <v-icon>mdi-delete</v-icon>
-            </v-btn>
-          </div>
-        </template>
+          <v-data-table
+            v-model="selectedDraftIds"
+            :headers="headers"
+            :items="visibleDrafts"
+            item-value="id"
+            :items-per-page="5"
+            class="elevation-1"
+            show-select
+          >
+            <template v-slot:[`item.name`]="{ item }">
+              <div class="d-flex align-center" style="gap: 6px;">
+                <span>{{ item.name }}</span>
+                <v-btn
+                  icon
+                  size="x-small"
+                  color="primary"
+                  variant="text"
+                  :title="`修改名稱 ${item.name}`"
+                  @click="openRenameDialog(item)"
+                >
+                  <v-icon>mdi-pencil-outline</v-icon>
+                </v-btn>
+              </div>
+            </template>
 
-        <template #no-data>
-          <div class="text-center py-4">
-            {{ hasSearchKeyword ? '找不到符合的草稿' : '尚未建立批次草稿，請先點擊「新增草稿」。' }}
-          </div>
-        </template>
-      </v-data-table>
+            <template v-slot:[`item.status`]="{ item }">
+              <v-chip
+                :color="item.status === 'submitted' ? 'success' : 'warning'"
+                size="small"
+                variant="flat"
+              >
+                {{ item.status === 'submitted' ? '已送出' : '草稿' }}
+              </v-chip>
+            </template>
+
+            <template v-slot:[`item.recordId`]="{ item }">
+              {{ item.recordId || '-' }}
+            </template>
+
+            <template v-slot:[`item.updatedAt`]="{ item }">
+              {{ formatDate(item.updatedAt) }}
+            </template>
+
+            <template v-slot:[`item.actions`]="{ item }">
+              <div class="d-flex align-center" style="gap: 8px;">
+                <v-btn
+                  icon
+                  size="x-small"
+                  color="info"
+                  variant="elevated"
+                  :title="`預覽 ${item.name}`"
+                  @click="openPreview(item)"
+                >
+                  <v-icon>mdi-eye</v-icon>
+                </v-btn>
+                <v-btn
+                  icon
+                  size="x-small"
+                  color="primary"
+                  variant="elevated"
+                  :title="`編輯 ${item.name}`"
+                  @click="openForm(item)"
+                >
+                  <v-icon>mdi-pencil</v-icon>
+                </v-btn>
+                <v-btn
+                  icon
+                  size="x-small"
+                  color="info"
+                  variant="elevated"
+                  :title="`複製 ${item.name}`"
+                  @click="duplicateDraft(item)"
+                >
+                  <v-icon>mdi-content-copy</v-icon>
+                </v-btn>
+                <v-btn
+                  v-if="item.status !== 'submitted'"
+                  icon
+                  size="x-small"
+                  color="error"
+                  variant="elevated"
+                  @click="removeDraft(item)"
+                >
+                  <v-icon>mdi-delete</v-icon>
+                </v-btn>
+              </div>
+            </template>
+
+            <template #no-data>
+              <div class="text-center py-4">
+                {{ hasSearchKeyword ? '找不到符合的草稿' : '尚未建立草稿，請先點擊「新增草稿」。' }}
+              </div>
+            </template>
+          </v-data-table>
+        </v-window-item>
+      </v-window>
     </v-card-text>
   </v-card>
 
@@ -234,7 +314,7 @@
             </v-card-text>
           </v-card>
           <v-card
-            v-if="defaultFormId"
+            v-if="previewFormId"
             variant="outlined"
           >
             <v-card-title class="text-subtitle-1 bg-grey-lighten-4">
@@ -252,7 +332,7 @@
               <DynamicFormRenderer
                 v-else
                 :key="previewDraft.id"
-                :form-id="defaultFormId"
+                :form-id="previewFormId"
                 :initial-values="previewDraft.values || {}"
                 :readonly="true"
                 :show-actions="false"
@@ -281,8 +361,9 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { formDataService } from '@/api/services/formData'
+import { formsService } from '@/api/services/forms'
 import { useSwal } from '@/composables/useSwal'
-import { FORMS_UPDATED_EVENT, resolveDefaultFormId } from '@/utils/resolveDefaultForm'
+import { FORMS_UPDATED_EVENT } from '@/utils/formsUpdatedEvent'
 import { useBatchMaterialApplicationsStore } from '@/stores/batchMaterialApplications'
 import DynamicFormRenderer from './DynamicFormRenderer.vue'
 
@@ -291,9 +372,11 @@ const router = useRouter()
 const swal = useSwal()
 const batchStore = useBatchMaterialApplicationsStore()
 
-const loadingDefaultForm = ref(false)
+const currentStep = ref(1)
+const loadingForms = ref(false)
+const activeForms = ref([])
+const selectedForm = ref(null)
 const batchSubmitting = ref(false)
-const defaultFormId = ref(null)
 const selectedDraftIds = ref([])
 const renameDialog = ref(false)
 const renamingDraftId = ref(null)
@@ -311,29 +394,90 @@ const headers = [
 ]
 
 const drafts = computed(() => batchStore.drafts)
+const selectedFormId = computed(() => selectedForm.value?.id ?? null)
 const hasSearchKeyword = computed(() => (searchKeyword.value || '').trim().length > 0)
+
 const visibleDrafts = computed(() => {
   const keyword = (searchKeyword.value || '').trim().toLowerCase()
   return drafts.value
     .filter(item => item.status === 'draft')
+    .filter(item => {
+      if (!selectedFormId.value) {
+        return true
+      }
+      return !item.formId || item.formId === selectedFormId.value
+    })
     .filter(item => !keyword || (item.name || '').toLowerCase().includes(keyword))
 })
 
-async function loadDefaultForm () {
-  loadingDefaultForm.value = true
+const previewFormId = computed(() => {
+  if (!previewDraft.value) {
+    return null
+  }
+  return previewDraft.value.formId || selectedFormId.value
+})
+
+async function loadActiveForms () {
+  loadingForms.value = true
   try {
-    defaultFormId.value = await resolveDefaultFormId()
+    activeForms.value = await formsService.getForms({ is_active: true })
   } catch (error) {
-    console.error('載入預設表單失敗', error)
-    defaultFormId.value = null
-    await swal.error('載入表單定義失敗，請稍後再試')
+    console.error('載入表單列表失敗', error)
+    activeForms.value = []
+    await swal.error('載入表單列表失敗，請稍後再試')
   } finally {
-    loadingDefaultForm.value = false
+    loadingForms.value = false
   }
 }
 
+function syncBatchRouteView (view) {
+  router.replace({
+    path: '/',
+    query: {
+      tab: 'batch-apply',
+      batchView: view,
+    },
+  })
+}
+
+function applyBatchViewFromRoute () {
+  const view = route.query.batchView
+  if (view === 'drafts' && selectedForm.value) {
+    currentStep.value = 2
+    return
+  }
+  currentStep.value = 1
+  selectedDraftIds.value = []
+  searchKeyword.value = ''
+  if (view === 'select') {
+    selectedForm.value = null
+  }
+}
+
+function selectForm (form) {
+  selectedForm.value = form
+  selectedDraftIds.value = []
+  searchKeyword.value = ''
+  currentStep.value = 2
+  syncBatchRouteView('drafts')
+}
+
+function goToFormSelection () {
+  currentStep.value = 1
+  selectedDraftIds.value = []
+  searchKeyword.value = ''
+  syncBatchRouteView('select')
+}
+
 function createDraft () {
-  batchStore.createDraft()
+  if (!selectedForm.value) {
+    return
+  }
+  batchStore.createDraft({
+    formId: selectedForm.value.id,
+    formName: selectedForm.value.form_name,
+    formCode: selectedForm.value.form_code,
+  })
 }
 
 function getDraftRow (item) {
@@ -405,8 +549,9 @@ function openForm (item) {
 async function openPreview (item) {
   const draft = getDraftRow(item)
   if (!draft?.id) return
-  if (!defaultFormId.value) {
-    await swal.warning('表單尚未載入完成')
+  const formId = draft.formId || selectedFormId.value
+  if (!formId) {
+    await swal.warning('找不到對應的表單')
     return
   }
   previewDraft.value = draft
@@ -426,11 +571,6 @@ function hasAnyValue (values) {
 }
 
 async function submitAllDrafts () {
-  if (!defaultFormId.value) {
-    await swal.warning('表單尚未載入完成')
-    return
-  }
-
   if (selectedDraftIds.value.length === 0) {
     await swal.warning('請先勾選要送出的草稿')
     return
@@ -450,11 +590,18 @@ async function submitAllDrafts () {
   let successCount = 0
 
   for (const draft of pendingDrafts) {
+    const formId = draft.formId || selectedFormId.value
+    if (!formId) {
+      failedItems.push(`${draft.name}：找不到對應的表單`)
+      failedDraftIds.push(draft.id)
+      continue
+    }
+
     try {
       if (!hasAnyValue(draft.values)) {
         throw new Error('尚未填寫內容')
       }
-      const result = await formDataService.createFormData(defaultFormId.value, draft.values, { createRecord: true })
+      const result = await formDataService.createFormData(formId, draft.values, { createRecord: true })
       const recordId = result?.record_id || result?.id || 'N/A'
       batchStore.markSubmitted(draft.id, recordId)
       successCount += 1
@@ -474,7 +621,6 @@ async function submitAllDrafts () {
     return
   }
 
-  // 只保留送出失敗的勾選，方便使用者修正後重送
   selectedDraftIds.value = selectedDraftIds.value.filter(id => failedDraftIds.includes(id))
 
   await swal.warning(
@@ -488,23 +634,52 @@ function formatDate (date) {
   return new Date(date).toLocaleString('zh-TW')
 }
 
+function handleFormsUpdated () {
+  loadActiveForms()
+}
+
 onMounted(async () => {
-  await loadDefaultForm()
-  window.addEventListener(FORMS_UPDATED_EVENT, loadDefaultForm)
+  await loadActiveForms()
+  window.addEventListener(FORMS_UPDATED_EVENT, handleFormsUpdated)
 })
 
 onUnmounted(() => {
-  window.removeEventListener(FORMS_UPDATED_EVENT, loadDefaultForm)
+  window.removeEventListener(FORMS_UPDATED_EVENT, handleFormsUpdated)
 })
 
-watch(() => route.query.tab, tab => {
-  if (tab === 'batch-apply') {
-    loadDefaultForm()
-  }
-})
+watch(
+  () => [route.query.tab, route.query.batchView],
+  ([tab]) => {
+    if (tab !== 'batch-apply') {
+      return
+    }
+    loadActiveForms()
+    applyBatchViewFromRoute()
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped lang="scss">
+.form-select-btn {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.form-select-btn__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  white-space: normal;
+  text-align: center;
+}
+
+.form-select-btn__en {
+  min-height: 20px;
+  line-height: 20px;
+}
+
 .detail-item {
   padding: 8px 0;
   min-height: 40px;

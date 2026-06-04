@@ -110,4 +110,17 @@ export const packagingService = {
   async savePackagingTemplate (formId, templateType, templateValues) {
     return getImplementation().savePackagingTemplate(formId, templateType, templateValues)
   },
+
+  /**
+   * 刪除指定表單的所有包裝說明模板
+   * @param {number|string} formId - 表單 ID 或 form_code
+   * @returns {Promise<void>}
+   */
+  async deleteAllPackagingTemplatesForForm (formId) {
+    const impl = getImplementation()
+    if (impl.deleteAllPackagingTemplatesForForm) {
+      return impl.deleteAllPackagingTemplatesForForm(formId)
+    }
+    throw new Error('目前後端不支援刪除表單包裝模板')
+  },
 }

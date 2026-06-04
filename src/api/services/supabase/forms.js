@@ -25,10 +25,6 @@ export default {
       query = query.eq('is_active', filters.is_active)
     }
 
-    if (filters.is_default !== undefined) {
-      query = query.eq('is_default', filters.is_default)
-    }
-
     if (filters.form_code) {
       query = query.eq('form_code', filters.form_code)
     }
@@ -95,17 +91,11 @@ export default {
       throw new Error('Supabase 客戶端未初始化')
     }
 
-    // 如果設置為預設表單，先取消其他表單的預設狀態
-    if (formData.is_default === true) {
-      await supabase
-        .from('forms')
-        .update({ is_default: false })
-        .eq('is_default', true) // 只更新當前是預設的表單
-    }
+    const { is_default: _removedDefault, ...formPayload } = formData
 
     const { data, error } = await supabase
       .from('forms')
-      .insert(formData)
+      .insert(formPayload)
       .select()
       .maybeSingle()
 
@@ -128,17 +118,11 @@ export default {
       throw new Error('Supabase 客戶端未初始化')
     }
 
-    // 如果設置為預設表單，先取消其他表單的預設狀態
-    if (updates.is_default === true) {
-      await supabase
-        .from('forms')
-        .update({ is_default: false })
-        .neq('id', id) // 排除當前表單
-    }
+    const { is_default: _removedDefault, ...updatePayload } = updates
 
     const { data, error } = await supabase
       .from('forms')
-      .update(updates)
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .maybeSingle()
@@ -195,7 +179,6 @@ export default {
       description: newFormData.description || originalForm.description,
       form_config: newFormData.form_config || originalForm.form_config,
       is_active: newFormData.is_active !== undefined ? newFormData.is_active : originalForm.is_active,
-      is_default: false, // 複製的表單預設不是預設表單
     }
 
     const createdForm = await this.createForm(newForm)

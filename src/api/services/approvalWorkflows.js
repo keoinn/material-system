@@ -198,6 +198,28 @@ export const approvalWorkflowsService = {
   },
 
   /**
+   * 依表單 ID 解析審核流程（form_codes 匹配 > 預設流程）
+   * @param {number} formId - 表單 ID
+   * @returns {Promise<number|null>}
+   */
+  async resolveWorkflowIdForForm (formId) {
+    const impl = getImplementation()
+    if (!impl) throw new Error('審核流程服務目前僅支援 Supabase')
+    return impl.resolveWorkflowIdForForm(formId)
+  },
+
+  /**
+   * 依表單代碼解析審核流程（form_codes 匹配 > 預設流程）
+   * @param {string} formCode - 表單代碼
+   * @returns {Promise<number|null>}
+   */
+  async resolveWorkflowIdByFormCode (formCode) {
+    const impl = getImplementation()
+    if (!impl) throw new Error('審核流程服務目前僅支援 Supabase')
+    return impl.resolveWorkflowIdByFormCode(formCode)
+  },
+
+  /**
    * 執行審核操作（核准、退回等）
    * @param {Object} actionData - 操作資料
    * @returns {Promise<Object>}

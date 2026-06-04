@@ -135,14 +135,6 @@
                   variant="outlined"
                 />
               </v-col>
-              <v-col cols="12" md="6">
-                <v-switch
-                  v-model="formData.is_default"
-                  color="primary"
-                  hide-details
-                  label="設為預設表單"
-                />
-              </v-col>
               <v-col cols="12">
                 <div class="d-flex align-center flex-wrap" style="gap: 8px;">
                   <v-btn
@@ -884,6 +876,7 @@
                   <v-combobox
                     v-model="fieldData.field_group"
                     clearable
+                    hide-details="auto"
                     hint="選擇現有群組或輸入新群組名稱，用於分組顯示"
                     item-title="title"
                     item-value="value"
@@ -908,6 +901,7 @@
                     v-model="fieldData.sub_group"
                     clearable
                     :disabled="!fieldData.field_group"
+                    hide-details="auto"
                     hint="選擇現有子群組或輸入新子群組名稱，用於排版顯示"
                     item-title="title"
                     item-value="value"
@@ -1200,6 +1194,7 @@
                           <v-combobox
                             v-model="fieldData.field_group"
                             clearable
+                            hide-details="auto"
                             hint="選擇現有群組或輸入新群組名稱"
                             item-title="title"
                             item-value="value"
@@ -1224,6 +1219,7 @@
                             v-model="fieldData.sub_group"
                             clearable
                             :disabled="!fieldData.field_group"
+                            hide-details="auto"
                             hint="選擇現有子群組或輸入新子群組名稱"
                             item-title="title"
                             item-value="value"
@@ -1245,6 +1241,44 @@
                               </v-list-item>
                             </template>
                           </v-combobox>
+                        </v-col>
+                        <v-col cols="12">
+                          <input
+                            ref="cascadingExcelFileInputRef"
+                            accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                            class="d-none"
+                            type="file"
+                            @change="handleCascadingExcelFileChange"
+                          >
+                          <div class="d-flex flex-wrap align-center ga-2 mb-2">
+                            <v-btn
+                              color="success"
+                              :loading="cascadingExcelImporting"
+                              prepend-icon="mdi-file-excel"
+                              size="small"
+                              variant="outlined"
+                              @click="triggerCascadingExcelImport"
+                            >
+                              Excel 匯入
+                            </v-btn>
+                            <v-btn
+                              color="primary"
+                              prepend-icon="mdi-download"
+                              size="small"
+                              variant="tonal"
+                              @click="downloadCascadingExcelTemplateFile"
+                            >
+                              下載範本
+                            </v-btn>
+                          </div>
+                          <v-alert
+                            density="compact"
+                            type="info"
+                            variant="tonal"
+                          >
+                            第 1 列：<strong>B/D/F/H</strong> 欄為各層「欄位鍵值」（至多
+                            {{ MAX_CASCADING_EXCEL_LEVELS }} 層）；第 2 列為 code / text 標題；第 3 列起每列一條完整路徑（請先「下載範本」填寫）。
+                          </v-alert>
                         </v-col>
                       </v-row>
                     </v-card-text>
@@ -1573,7 +1607,7 @@
                             <div class="d-flex align-center mb-3">
                               <v-icon class="mr-2" color="primary" size="small">mdi-menu-right</v-icon>
                               <span class="text-subtitle-2 font-weight-bold">
-                                當選擇「{{ level1Option.label || level1Option.value }}」時的子選項
+                                當選擇「{{ formatCascadingOptionDisplay(level1Option) }}」時的子選項
                               </span>
                               <v-spacer />
                               <v-chip color="primary" size="small" variant="flat">
@@ -1703,14 +1737,14 @@
                               <template v-if="level1Option.children && level1Option.children.length > 0">
                                 <div
                                   v-for="(level2Option, level2OptionIndex) in level1Option.children"
-                                  :key="level2OptionIndex"
+                                  :key="`${level1OptionIndex}-${level2Option.value}-${level2OptionIndex}`"
                                   class="mb-3 pa-3 border rounded"
                                   style="background: #f0f4f8;"
                                 >
                                   <div class="d-flex align-center mb-3">
                                     <v-icon class="mr-2" color="primary" size="small">mdi-menu-right</v-icon>
                                     <span class="text-subtitle-2 font-weight-bold">
-                                      當選擇「{{ level1Option.label || level1Option.value }}」→「{{ level2Option.label || level2Option.value }}」時的子選項
+                                      當選擇「{{ formatCascadingOptionDisplay(level1Option) }}」→「{{ formatCascadingOptionDisplay(level2Option) }}」時的子選項
                                     </span>
                                     <v-spacer />
                                     <v-chip color="primary" size="small" variant="flat">
@@ -1790,7 +1824,7 @@
                                 variant="tonal"
                               >
                                 <div class="text-body-2">
-                                  選項「{{ level1Option.label || level1Option.value }}」尚未設定層級 2 的子選項。
+                                  選項「{{ formatCascadingOptionDisplay(level1Option) }}」尚未設定層級 2 的子選項。
                                 </div>
                               </v-alert>
                             </div>
@@ -2460,6 +2494,12 @@
   import { optionWorkbooksService } from '@/api/services/optionWorkbooks'
   import { useResizable } from '@/composables/useResizable'
   import { useSwal } from '@/composables/useSwal'
+  import {
+    downloadPublicCascadingSelectExcelTemplate,
+    MAX_CASCADING_EXCEL_LEVELS,
+    mergeCascadingOptionTrees,
+    parseCascadingSelectExcelFile,
+  } from '@/utils/cascadingSelectExcelImport'
   import JsonCodeEditor from './JsonCodeEditor.vue'
   import AggregatedField from './form-fields/AggregatedField.vue'
   import CascadingSelectField from './form-fields/CascadingSelectField.vue'
@@ -2711,7 +2751,6 @@
       form_name_en: formData.form_name_en || '',
       description: formData.description || '',
       is_active: formData.is_active !== false,
-      is_default: formData.is_default || false,
       form_config: formConfig,
       fields: fields.value.map((field, index) => buildFieldPayload(field, index)),
     }
@@ -2791,9 +2830,6 @@
     if (parsed.is_active !== undefined) {
       formData.is_active = parsed.is_active !== false
     }
-    if (parsed.is_default !== undefined) {
-      formData.is_default = parsed.is_default || false
-    }
 
     if (parsed.form_config && typeof parsed.form_config === 'object') {
       const { group_order, sub_groups, ...restConfig } = parsed.form_config
@@ -2845,7 +2881,6 @@
     form_name_en: '',
     description: '',
     is_active: true,
-    is_default: false,
     form_config: {},
   })
 
@@ -2884,6 +2919,8 @@
   const fieldOptions = ref([])
   const cascadingLevels = ref([]) // 多層選單配置
   const cascadingLevelCount = ref(1) // 層次數量
+  const cascadingExcelFileInputRef = ref(null)
+  const cascadingExcelImporting = ref(false)
   const fieldConfigJson = ref('{}')
   const isUpdatingJsonFromData = ref(false) // 標記是否正在從 fieldData 更新 JSON（避免循環更新）
   const jsonError = ref(false) // JSON 格式錯誤標記
@@ -3112,7 +3149,6 @@
           form_name_en: form.form_name_en || '',
           description: form.description || '',
           is_active: form.is_active !== false,
-          is_default: form.is_default || false,
           form_config: form.form_config || {},
         })
 
@@ -3963,6 +3999,109 @@
     updateJsonFromFieldData()
   }
 
+  function triggerCascadingExcelImport () {
+    if (!needsCascadingLevels.value) {
+      return
+    }
+    cascadingExcelFileInputRef.value?.click()
+  }
+
+  function downloadCascadingExcelTemplateFile () {
+    try {
+      downloadPublicCascadingSelectExcelTemplate()
+    } catch (error) {
+      console.error('下載範本失敗', error)
+      void swal.error('下載範本失敗', error.message)
+    }
+  }
+
+  async function handleCascadingExcelFileChange (event) {
+    const file = event.target?.files?.[0]
+    event.target.value = ''
+    if (!file) {
+      return
+    }
+
+    cascadingExcelImporting.value = true
+    try {
+      const configuredCount = Number(cascadingLevelCount.value) || 0
+      const parsed = await parseCascadingSelectExcelFile(
+        file,
+        configuredCount > 0 ? configuredCount : MAX_CASCADING_EXCEL_LEVELS,
+      )
+      const {
+        options,
+        errors,
+        rowCount,
+        fieldKeys = [],
+        levelCount: importedLevelCount = 0,
+        format,
+      } = parsed
+
+      if (format === 'key_option' && importedLevelCount > 0) {
+        if (importedLevelCount !== Number(cascadingLevelCount.value)) {
+          cascadingLevelCount.value = importedLevelCount
+        }
+        updateCascadingLevelCount()
+      } else if (cascadingLevels.value.length === 0) {
+        if (configuredCount < 1) {
+          cascadingLevelCount.value = 1
+        }
+        updateCascadingLevelCount()
+      }
+
+      if (!cascadingLevels.value[0]) {
+        await swal.error('無法初始化層級設定')
+        return
+      }
+      const existing = cascadingLevels.value[0].options || []
+      let mode = 'replace'
+
+      if (existing.length > 0) {
+        const choice = await swal.confirm(
+          `已解析 ${rowCount} 列、${options.length} 個第一層選項。\n\n「確定」＝合併至現有選項\n「取消」＝取代現有選項`,
+          'Excel 匯入',
+        )
+        mode = choice.isConfirmed ? 'merge' : 'replace'
+      }
+
+      const nextOptions = mode === 'merge'
+        ? mergeCascadingOptionTrees(existing, options)
+        : options
+
+      cascadingLevels.value[0].options = nextOptions
+
+      if (fieldKeys.length > 0) {
+        for (let i = 0; i < fieldKeys.length; i++) {
+          const key = fieldKeys[i]
+          if (!key || !cascadingLevels.value[i]) {
+            continue
+          }
+          cascadingLevels.value[i].field_key = key
+        }
+      }
+
+      updateJsonFromFieldData()
+
+      let message = `已匯入 ${nextOptions.length} 個第一層選項`
+      if (format === 'key_option' && importedLevelCount > 0) {
+        message += `，層次數量已設為 ${importedLevelCount}`
+      }
+      if (fieldKeys.filter(Boolean).length > 0) {
+        message += `，並更新 ${fieldKeys.filter(Boolean).length} 個層級欄位鍵值`
+      }
+      if (errors.length > 0) {
+        message += `（${errors.length} 列略過或格式不完整）`
+      }
+      await swal.success(message)
+    } catch (error) {
+      console.error('Excel 匯入失敗', error)
+      await swal.error('Excel 匯入失敗', error.message || '請檢查檔案格式')
+    } finally {
+      cascadingExcelImporting.value = false
+    }
+  }
+
   // 更新層次數量
   function updateCascadingLevelCount () {
     const currentCount = cascadingLevels.value.length
@@ -4126,6 +4265,22 @@
         updateJsonFromFieldData()
       }
     }
+  }
+
+  /** 選項標題：標籤與 code 不同時一併顯示，避免同名標籤被誤認為同一區塊 */
+  function formatCascadingOptionDisplay (option) {
+    if (!option) {
+      return ''
+    }
+    const value = String(option.value ?? '').trim()
+    const label = String(option.label ?? '').trim()
+    if (!label) {
+      return value
+    }
+    if (!value || label === value) {
+      return label
+    }
+    return `${label}（${value}）`
   }
 
   // 在指定選項下添加子選項
@@ -5286,7 +5441,6 @@
           form_name_en: formData.form_name_en,
           description: formData.description,
           is_active: formData.is_active,
-          is_default: formData.is_default,
           form_config: formConfig,
         })
         formId = updatedForm.id
@@ -5298,7 +5452,6 @@
           form_name_en: formData.form_name_en || '',
           description: formData.description || '',
           is_active: formData.is_active !== false,
-          is_default: formData.is_default || false,
           form_config: formConfig,
         })
         formId = newForm.id
@@ -5353,7 +5506,6 @@
           form_name_en: formData.form_name_en,
           description: formData.description,
           is_active: formData.is_active,
-          is_default: formData.is_default,
           form_config: formConfig,
         })
         formId = updatedForm.id
@@ -5441,7 +5593,6 @@
           form_name_en: formData.form_name_en || '',
           description: formData.description || '',
           is_active: formData.is_active !== false,
-          is_default: formData.is_default || false,
           form_config: formConfig,
         })
         formId = newForm.id
@@ -6154,6 +6305,14 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+
+  // 無驗證訊息、提示時不保留 v-messages 佔位高度
+  :deep(.v-input__details:not(:has(.v-messages__message))) {
+    display: none;
+    min-height: 0;
+    padding-top: 0;
+    margin-top: 0;
+  }
 }
 
 .field-dialog-size-label {

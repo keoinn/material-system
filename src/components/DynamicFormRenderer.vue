@@ -1,7 +1,15 @@
 <template>
   <v-card v-if="form">
     <v-card-title v-if="showTitle" class="system-header">
-      <h2>{{ form.form_name || form.form_name_en }}</h2>
+      <div>
+        <h2 class="ma-0">{{ form.form_name || form.form_name_en }}</h2>
+        <div
+          v-if="form.form_code"
+          class="text-caption text-white mt-1 form-renderer-header-form-code"
+        >
+          表單代碼：{{ form.form_code }}
+        </div>
+      </div>
     </v-card-title>
 
     <v-card-text class="pt-6">
@@ -1067,6 +1075,11 @@
 
 <style scoped lang="scss">
 @import '@/styles/material-system.scss';
+
+.form-renderer-header-form-code {
+  color: #fff;
+  opacity: 0.95;
+}
 
 .form-group-panels {
   :deep(.v-expansion-panel) {

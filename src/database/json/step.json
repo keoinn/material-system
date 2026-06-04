@@ -1,0 +1,63 @@
+[
+  {
+    "id": 1,
+    "step_order": 1,
+    "step_name": "草稿 ➡︎ SA待審核",
+    "step_name_en": "",
+    "description": "",
+    "status_code": "DRAFT",
+    "approver_type": "AUTO",
+    "approver_config": {},
+    "approval_departments": [],
+    "approver_user_ids": [],
+    "approve_status_code": "SA_PENDING",
+    "reject_status_code": "DRAFT",
+    "is_conditional": false,
+    "trigger_insert_order": null,
+    "trigger_field": null,
+    "trigger_value": null,
+    "trigger_operator": null
+  },
+  {
+    "id": 2,
+    "step_order": 2,
+    "step_name": "SA待審核 ➡︎ 待審核",
+    "step_name_en": "",
+    "description": "",
+    "status_code": "SA_PENDING",
+    "approver_type": "ROLE",
+    "approver_config": {
+      "role": "admin"
+    },
+    "approval_departments": [],
+    "approver_user_ids": [],
+    "approve_status_code": "PENDING",
+    "reject_status_code": "DRAFT",
+    "is_conditional": false,
+    "trigger_insert_order": null,
+    "trigger_field": null,
+    "trigger_value": null,
+    "trigger_operator": null
+  },
+  {
+    "id": 3,
+    "step_order": 3,
+    "step_name": "待審核 ➡︎ 完成",
+    "step_name_en": "",
+    "description": "",
+    "status_code": "PENDING",
+    "approver_type": "ROLE",
+    "approver_config": {
+      "role": "admin"
+    },
+    "approval_departments": [],
+    "approver_user_ids": [],
+    "approve_status_code": "APPROVED",
+    "reject_status_code": "REJECTED",
+    "is_conditional": false,
+    "trigger_insert_order": null,
+    "trigger_field": null,
+    "trigger_value": null,
+    "trigger_operator": null
+  }
+]

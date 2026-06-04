@@ -150,6 +150,16 @@
                         <span class="detail-value">{{ formatDate(selectedApplication.submit_date || selectedApplication.submitDate) }}</span>
                       </div>
                     </v-col>
+                    <v-col
+                      v-if="selectedApplication.workflow_name || selectedApplication.workflow_code"
+                      cols="12"
+                      md="6"
+                    >
+                      <div class="detail-item">
+                        <span class="detail-label">審核流程：</span>
+                        <span class="detail-value">{{ formatWorkflowName(selectedApplication) }}</span>
+                      </div>
+                    </v-col>
                     <v-col cols="12" md="6">
                       <div class="detail-item">
                         <span class="detail-label">狀態：</span>
@@ -160,6 +170,16 @@
                         >
                           {{ selectedApplication.current_status_name || getStatusText(selectedApplication.current_status_code || selectedApplication.status) }}
                         </v-chip>
+                      </div>
+                    </v-col>
+                    <v-col
+                      v-if="selectedApplication.current_step_name"
+                      cols="12"
+                      md="6"
+                    >
+                      <div class="detail-item">
+                        <span class="detail-label">當前步驟：</span>
+                        <span class="detail-value">{{ selectedApplication.current_step_name }}</span>
                       </div>
                     </v-col>
                   </v-row>
@@ -430,6 +450,14 @@
     return new Date(dateString).toLocaleDateString('zh-TW')
   }
 
+  function formatWorkflowName (application) {
+    if (!application) return 'N/A'
+    if (application.workflow_name && application.workflow_code) {
+      return `${application.workflow_name} (${application.workflow_code})`
+    }
+    return application.workflow_name || application.workflow_code || 'N/A'
+  }
+
   function getStatusColor (status) {
     // 如果狀態有對應的顏色，使用它；否則使用預設顏色
     const statusMap = {
@@ -685,6 +713,30 @@
       const materialLabel = getFieldLabelByValue(materialKey, materialValue)
 
       // 使用從 form_data_values 讀取的資料
+      let workflowName = application.workflow_name
+      let workflowCode = application.workflow_code
+      let currentStepName = application.current_step_name
+
+      if ((!workflowName && !workflowCode) && application.form_id) {
+        try {
+          const approvalRecord = await approvalWorkflowsService.getApprovalRecord(
+            application.form_id,
+            application.record_id || application.id,
+          )
+          if (approvalRecord?.workflow_id) {
+            const workflow = await approvalWorkflowsService.getWorkflow(approvalRecord.workflow_id)
+            workflowName = workflow?.workflow_name || workflowName
+            workflowCode = workflow?.workflow_code || workflowCode
+          }
+          if (approvalRecord?.current_step_id && !currentStepName) {
+            const steps = await approvalWorkflowsService.getWorkflowSteps(approvalRecord.workflow_id)
+            currentStepName = steps.find(step => step.id === approvalRecord.current_step_id)?.step_name || currentStepName
+          }
+        } catch (error) {
+          console.warn('載入審核流程資訊失敗', error)
+        }
+      }
+
       selectedApplication.value = {
         ...application,
         submitDate: application.submit_date,
@@ -696,6 +748,9 @@
         applicant: application.applicant_name
           || application.applicant?.username
           || 'Unknown',
+        workflow_name: workflowName,
+        workflow_code: workflowCode,
+        current_step_name: currentStepName,
         isDynamicForm: true,
       }
 

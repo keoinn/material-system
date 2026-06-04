@@ -945,16 +945,22 @@ export default {
         const existingRecord = await approvalWorkflowsService.getApprovalRecord(formIdValue, newRecordId)
         
         if (!existingRecord) {
+          const workflowId = await approvalWorkflowsService.resolveWorkflowIdForForm(formIdValue)
+          if (!workflowId) {
+            throw new Error('找不到適用的審核流程，請先在審核流程設定中配置 form_codes 或預設流程')
+          }
+
           // 創建審核記錄
           await approvalWorkflowsService.createApprovalRecord({
             form_id: formIdValue,
             record_id: newRecordId,
             applicant_id: userId,
+            workflow_id: workflowId,
           })
         }
       } catch (approvalError) {
-        // 如果創建審核記錄失敗，記錄錯誤但不影響表單資料的創建
-        console.warn('創建審核記錄失敗（不影響表單資料創建）', approvalError)
+        console.error('創建審核記錄失敗', approvalError)
+        throw new Error(`建立審核流程失敗：${approvalError.message || '未知錯誤'}`)
       }
     }
 

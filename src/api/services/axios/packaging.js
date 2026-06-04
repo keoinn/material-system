@@ -93,5 +93,13 @@ export default {
     })
     return response.data || response
   },
+
+  /**
+   * 刪除指定表單的所有包裝說明模板
+   */
+  async deleteAllPackagingTemplatesForForm (formId) {
+    const response = await apiClient.delete(`/packaging/templates/${formId}`)
+    return response.data || response
+  },
 }
 

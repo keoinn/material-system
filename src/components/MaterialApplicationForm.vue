@@ -1,30 +1,35 @@
 <template>
   <div>
     <v-alert
-      v-if="!defaultFormId && !loading"
+      v-if="!activeFormId && !loading"
       class="mb-4"
-      type="warning"
+      type="info"
       variant="tonal"
     >
       <div class="d-flex align-center flex-wrap ga-2">
-        <span>尚未設定預設表單，請先到「表單管理」勾選「設為預設表單」並儲存。</span>
+        <span v-if="selectedDraft && !selectedDraft.formId">
+          此草稿尚未關聯表單，請回到「項目主檔申請表」重新選擇表單並建立草稿。
+        </span>
+        <span v-else>
+          請先到「項目主檔申請表」選擇啟用中的表單並建立草稿，再於此編輯申請內容。
+        </span>
         <v-btn
-          color="warning"
+          color="primary"
           size="small"
           variant="outlined"
-          @click="loadDefaultForm"
+          @click="goToBatchApply"
         >
-          重新載入
+          前往項目主檔申請表
         </v-btn>
       </div>
     </v-alert>
 
     <DynamicFormRenderer
-      v-if="defaultFormId"
+      v-if="activeFormId"
       :key="activeFormKey"
       ref="formRendererRef"
       :cancel-text="cancelText"
-      :form-id="defaultFormId"
+      :form-id="activeFormId"
       :initial-values="activeInitialValues"
       :show-actions="true"
       :show-cancel="true"
@@ -40,12 +45,17 @@
 <script setup>
   import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
-  import { formDataService } from '@/api/services/formData'
   import { formFieldsService } from '@/api/services/formFields'
+  import { formsService } from '@/api/services/forms'
   import { packagingService } from '@/api/services/packaging'
   import { useSwal } from '@/composables/useSwal'
   import { useBatchMaterialApplicationsStore } from '@/stores/batchMaterialApplications'
-  import { FORMS_UPDATED_EVENT, resolveDefaultFormId } from '@/utils/resolveDefaultForm'
+  import { FORMS_UPDATED_EVENT } from '@/utils/formsUpdatedEvent'
+  import {
+    getPackagingCategoryFieldKey,
+    PACKAGING_TEMPLATE_DEFAULT_TYPE,
+    resolveTemplateTypeFromFieldValue,
+  } from '@/utils/packagingTemplateConfig'
   import DynamicFormRenderer from './DynamicFormRenderer.vue'
 
   const route = useRoute()
@@ -55,14 +65,22 @@
 
   const formRendererRef = ref(null)
   const loading = ref(false)
-  const defaultFormId = ref(null)
   const loadingTemplate = ref(false)
+  const packagingCategoryFieldKey = ref(null)
 
   const selectedDraft = computed(() => batchStore.selectedDraft)
+  const activeFormId = computed(() => selectedDraft.value?.formId ?? null)
   const activeInitialValues = computed(() => selectedDraft.value?.values || {})
-  const activeFormKey = computed(() => selectedDraft.value?.id || 'single-form')
-  const submitText = computed(() => selectedDraft.value ? '儲存草稿' : '提交申請')
-  const cancelText = computed(() => selectedDraft.value ? '清除目前草稿' : '清除表單')
+  const activeFormKey = computed(() => {
+    const draftId = selectedDraft.value?.id || 'none'
+    return `${draftId}-${activeFormId.value || 'none'}`
+  })
+  const submitText = computed(() => '儲存草稿')
+  const cancelText = computed(() => '清除目前草稿')
+
+  function goToBatchApply () {
+    router.push({ path: '/', query: { tab: 'batch-apply', batchView: 'select' } })
+  }
 
   async function syncDraftValuesToForm () {
     if (!selectedDraft.value || !formRendererRef.value?.setValues) {
@@ -72,48 +90,43 @@
     formRendererRef.value.setValues({ ...(selectedDraft.value.values || {}) })
   }
 
-  // 載入預設表單
-  async function loadDefaultForm () {
+  async function loadPackagingTemplateConfig () {
+    if (!activeFormId.value) {
+      packagingCategoryFieldKey.value = null
+      return
+    }
+    try {
+      const form = await formsService.getForm(activeFormId.value, false)
+      packagingCategoryFieldKey.value = getPackagingCategoryFieldKey(form?.form_config)
+    } catch (error) {
+      console.warn('載入包裝模板設定失敗', error)
+      packagingCategoryFieldKey.value = null
+    }
+  }
+
+  async function refreshFormContext () {
     loading.value = true
     try {
-      defaultFormId.value = await resolveDefaultFormId()
-    } catch (error) {
-      console.error('載入預設表單失敗', error)
-      defaultFormId.value = null
-      await swal.error('載入表單定義失敗，請稍後再試')
+      await loadPackagingTemplateConfig()
+      if (!packagingCategoryFieldKey.value && activeFormId.value) {
+        await loadTemplateForCategory(PACKAGING_TEMPLATE_DEFAULT_TYPE)
+      }
     } finally {
       loading.value = false
     }
   }
 
-  // 處理表單提交
   async function handleSubmit (formValues) {
-    try {
-      if (!defaultFormId.value) {
-        await swal.warning('表單尚未載入完成')
-        return
-      }
-
-      if (selectedDraft.value) {
-        batchStore.updateDraftValues(selectedDraft.value.id, formValues)
-        await swal.success('草稿已儲存')
-        router.push({ path: '/', query: { tab: 'batch-apply' } })
-        return
-      }
-
-      const result = await formDataService.createFormData(defaultFormId.value, formValues, { createRecord: true })
-      const recordId = result?.record_id || result?.id || 'N/A'
-
-      await swal.success(`申請單號：${recordId}`, '申請已提交！')
-
-      handleClear()
-    } catch (error) {
-      console.error('提交申請失敗', error)
-      await swal.error(error.message || '提交申請時發生錯誤')
+    if (!activeFormId.value || !selectedDraft.value) {
+      await swal.warning('請先到「項目主檔申請表」選擇表單並建立草稿')
+      return
     }
+
+    batchStore.updateDraftValues(selectedDraft.value.id, formValues)
+    await swal.success('草稿已儲存')
+    router.push({ path: '/', query: { tab: 'batch-apply', batchView: 'drafts' } })
   }
 
-  // 處理清除表單
   function handleClear () {
     if (selectedDraft.value) {
       batchStore.updateDraftValues(selectedDraft.value.id, {})
@@ -123,15 +136,30 @@
     }
   }
 
-  // 僅在「基本資料」內會影響產品大類／模板選擇的欄位變更時載入包裝模板。
-  // 若在任何欄位更新時都從 formValues 推斷大類並載入，使用者編輯其他區塊時也會觸發，導致 setValues 覆寫手動輸入。
-  const PACKAGING_TEMPLATE_TRIGGER_FIELD_KEYS = new Set([
+  const LEGACY_PACKAGING_TEMPLATE_TRIGGER_FIELD_KEYS = new Set([
     'main_type',
     'type',
     'main_category',
   ])
 
-  // 處理欄位更新事件
+  function resolveLegacyTemplateType (fieldKey, value) {
+    if (fieldKey === 'main_type' && typeof value === 'string' && value) {
+      return value
+    }
+    if (fieldKey === 'type' && Array.isArray(value) && value.length > 0 && value[0]) {
+      return String(value[0])
+    }
+    if (fieldKey === 'main_category') {
+      if (Array.isArray(value) && value.length > 0 && value[0]) {
+        return String(value[0])
+      }
+      if (typeof value === 'string' && value) {
+        return value
+      }
+    }
+    return null
+  }
+
   async function handleFieldUpdate (event) {
     const { fieldKey, value } = event
 
@@ -139,53 +167,39 @@
       batchStore.updateDraftValues(selectedDraft.value.id, event.formValues)
     }
 
-    if (!PACKAGING_TEMPLATE_TRIGGER_FIELD_KEYS.has(fieldKey)) {
+    const categoryKey = packagingCategoryFieldKey.value
+    if (categoryKey) {
+      if (fieldKey !== categoryKey) {
+        return
+      }
+      const templateType = resolveTemplateTypeFromFieldValue(value)
+      if (templateType) {
+        await loadTemplateForCategory(templateType)
+      }
       return
     }
 
-    // 產品大類可能是：
-    // 1. main_type - 單獨的欄位，值直接是產品大類代碼（如 'H', 'S', 'M'）
-    // 2. type - cascading_select，值是一個數組，第一層是產品大類代碼
-    // 3. main_category - 舊版欄位名稱（向後兼容）
-    let mainCategoryCode = null
-
-    if (fieldKey === 'main_type') {
-      if (typeof value === 'string' && value) {
-        mainCategoryCode = value
-      }
-    } else if (fieldKey === 'type') {
-      if (Array.isArray(value) && value.length > 0 && value[0]) {
-        mainCategoryCode = value[0]
-      }
-    } else if (fieldKey === 'main_category') {
-      if (Array.isArray(value) && value.length > 0 && value[0]) {
-        mainCategoryCode = value[0]
-      } else if (typeof value === 'string' && value) {
-        mainCategoryCode = value
-      }
+    if (!LEGACY_PACKAGING_TEMPLATE_TRIGGER_FIELD_KEYS.has(fieldKey)) {
+      return
     }
 
-    if (mainCategoryCode) {
-      await loadTemplateForCategory(mainCategoryCode)
+    const templateType = resolveLegacyTemplateType(fieldKey, value)
+    if (templateType) {
+      await loadTemplateForCategory(templateType)
     }
   }
 
-  // 載入指定產品大類的模板
   async function loadTemplateForCategory (mainCategoryCode) {
-    if (!defaultFormId.value || !mainCategoryCode || loadingTemplate.value) {
+    if (!activeFormId.value || !mainCategoryCode || loadingTemplate.value) {
       return
     }
 
     loadingTemplate.value = true
     try {
-      // 載入模板值
-      const template = await packagingService.getPackagingTemplate(defaultFormId.value, mainCategoryCode)
+      const template = await packagingService.getPackagingTemplate(activeFormId.value, mainCategoryCode)
 
-      if (template && template.template_values && formRendererRef.value) {
-        // 取得表單中所有標記為 is_in_template 的欄位
-        const fields = await formFieldsService.getFields(defaultFormId.value, { is_in_template: true })
-
-        // 只更新標記為 is_in_template 的欄位
+      if (template?.template_values && formRendererRef.value) {
+        const fields = await formFieldsService.getFields(activeFormId.value, { is_in_template: true })
         const templateValues = {}
         for (const field of fields) {
           if (template.template_values[field.field_key] !== undefined) {
@@ -193,35 +207,45 @@
           }
         }
 
-        // 將模板值填入表單（使用 setValues 方法）
-        if (Object.keys(templateValues).length > 0 && formRendererRef.value && formRendererRef.value.setValues) {
-          // 取得當前表單值
+        if (Object.keys(templateValues).length > 0 && formRendererRef.value?.setValues) {
           const currentValues = formRendererRef.value.getValues ? formRendererRef.value.getValues() : {}
-          // 合併模板值（模板值優先，但不覆蓋已填寫的值）
           const mergedValues = { ...currentValues, ...templateValues }
           formRendererRef.value.setValues(mergedValues)
         }
       }
     } catch (error) {
       console.warn('載入包裝模板失敗', error)
-      // 不顯示錯誤訊息，因為模板可能不存在
     } finally {
       loadingTemplate.value = false
     }
   }
 
   onMounted(() => {
-    loadDefaultForm()
-    window.addEventListener(FORMS_UPDATED_EVENT, loadDefaultForm)
+    refreshFormContext()
+    window.addEventListener(FORMS_UPDATED_EVENT, refreshFormContext)
   })
 
   onUnmounted(() => {
-    window.removeEventListener(FORMS_UPDATED_EVENT, loadDefaultForm)
+    window.removeEventListener(FORMS_UPDATED_EVENT, refreshFormContext)
   })
 
   watch(() => route.query.tab, tab => {
     if (tab === 'apply') {
-      loadDefaultForm()
+      refreshFormContext()
+    }
+  })
+
+  watch(() => selectedDraft.value?.formId, async () => {
+    await refreshFormContext()
+  })
+
+  watch(activeFormId, async (formId, prevId) => {
+    if (!formId || formId === prevId) {
+      return
+    }
+    await loadPackagingTemplateConfig()
+    if (!packagingCategoryFieldKey.value) {
+      await loadTemplateForCategory(PACKAGING_TEMPLATE_DEFAULT_TYPE)
     }
   })
 
@@ -245,7 +269,6 @@
 <style scoped lang="scss">
 @import '@/styles/material-system.scss';
 
-// 必填欄位的紅色星號
 :deep(.v-label__asterisk) {
   color: #f44336 !important;
 }

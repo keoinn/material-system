@@ -20,7 +20,7 @@ function getImplementation () {
 export const formsService = {
   /**
    * 取得所有表單列表
-   * @param {object} filters - 篩選條件（is_active, is_default 等）
+   * @param {object} filters - 篩選條件（is_active 等）
    * @returns {Promise<Array>}
    */
   async getForms (filters = {}) {
@@ -85,7 +85,6 @@ export const formsService = {
       description: newFormData.description || form.description,
       form_config: newFormData.form_config || form.form_config,
       is_active: newFormData.is_active !== undefined ? newFormData.is_active : form.is_active,
-      is_default: false, // 複製的表單預設不是預設表單
     }
     const createdForm = await this.createForm(newForm)
     

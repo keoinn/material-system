@@ -1,0 +1,79 @@
+[
+  {
+    "status_code": "DRAFT",
+    "status_name": "草稿",
+    "status_name_en": "Draft",
+    "description": "申請草稿，尚未提交",
+    "status_type": "INITIAL",
+    "color": "grey",
+    "icon": "mdi-file-document-outline",
+    "display_order": 0,
+    "is_active": true
+  },
+  {
+    "status_code": "SA_PENDING",
+    "status_name": "待 SA 審核",
+    "status_name_en": "",
+    "description": "",
+    "status_type": "INTERMEDIATE",
+    "color": "warning",
+    "icon": "",
+    "display_order": 1,
+    "is_active": true
+  },
+  {
+    "status_code": "PENDING",
+    "status_name": "待審核",
+    "status_name_en": "Pending",
+    "description": "等待審核中",
+    "status_type": "INTERMEDIATE",
+    "color": "warning",
+    "icon": "mdi-clock-outline",
+    "display_order": 2,
+    "is_active": true
+  },
+  {
+    "status_code": "IN_REVIEW",
+    "status_name": "審核中",
+    "status_name_en": "In Review",
+    "description": "正在審核中",
+    "status_type": "INTERMEDIATE",
+    "color": "info",
+    "icon": "mdi-eye-outline",
+    "display_order": 3,
+    "is_active": true
+  },
+  {
+    "status_code": "APPROVED",
+    "status_name": "已核准",
+    "status_name_en": "Approved",
+    "description": "已通過審核",
+    "status_type": "FINAL",
+    "color": "success",
+    "icon": "mdi-check-circle",
+    "display_order": 4,
+    "is_active": true
+  },
+  {
+    "status_code": "REJECTED",
+    "status_name": "已退回",
+    "status_name_en": "Rejected",
+    "description": "已退回修改",
+    "status_type": "FINAL",
+    "color": "error",
+    "icon": "mdi-close-circle",
+    "display_order": 5,
+    "is_active": true
+  },
+  {
+    "status_code": "RETURNED",
+    "status_name": "退回修改",
+    "status_name_en": "Returned",
+    "description": "退回申請人修改",
+    "status_type": "INTERMEDIATE",
+    "color": "warning",
+    "icon": "mdi-arrow-left-circle",
+    "display_order": 6,
+    "is_active": true
+  }
+]

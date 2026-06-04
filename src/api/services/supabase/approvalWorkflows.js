@@ -4,6 +4,44 @@
  */
 import { isSupabaseAvailable, supabase } from '../../supabase.js'
 
+function extractFormCode (value) {
+  if (value == null) return ''
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed === '[object Object]' ? '' : trimmed
+  }
+  if (typeof value === 'object') {
+    if (typeof value.value === 'string') return value.value.trim()
+    if (typeof value.form_code === 'string') return value.form_code.trim()
+    if (typeof value.title === 'string') {
+      const match = value.title.match(/\(([^)]+)\)\s*$/)
+      if (match) return match[1].trim()
+    }
+  }
+  return ''
+}
+
+function normalizeFormCodes (formCodes) {
+  if (formCodes == null) return []
+  if (typeof formCodes === 'string') {
+    const trimmed = formCodes.trim()
+    if (!trimmed) return []
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (Array.isArray(parsed)) {
+        return [...new Set(parsed.map(extractFormCode).filter(Boolean))]
+      }
+    } catch {
+      return trimmed === '[object Object]' ? [] : [trimmed]
+    }
+    return trimmed === '[object Object]' ? [] : [trimmed]
+  }
+  if (Array.isArray(formCodes)) {
+    return [...new Set(formCodes.map(extractFormCode).filter(Boolean))]
+  }
+  return []
+}
+
 export default {
   /**
    * 取得所有審核狀態定義
@@ -347,17 +385,98 @@ export default {
       .select('*')
       .eq('form_id', formId)
       .eq('record_id', recordId)
-      .single()
+      .maybeSingle()
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        // 記錄不存在
-        return null
-      }
       throw error
     }
 
     return data
+  },
+
+  /**
+   * 取得啟用中的審核流程列表
+   */
+  async _getActiveWorkflows () {
+    if (!isSupabaseAvailable()) {
+      return []
+    }
+
+    const { data, error } = await supabase
+      .from('approval_workflows')
+      .select('*')
+      .eq('is_active', true)
+
+    if (error) {
+      throw error
+    }
+
+    return data || []
+  },
+
+  /**
+   * 取得預設審核流程 ID
+   */
+  async _getDefaultWorkflowId (workflows = null) {
+    const list = workflows || await this._getActiveWorkflows()
+    const defaultWorkflow = list.find(workflow => workflow.is_default)
+    return defaultWorkflow?.id ?? null
+  },
+
+  /**
+   * 依表單代碼解析審核流程（form_codes 匹配 > 預設流程）
+   */
+  async resolveWorkflowIdByFormCode (formCode) {
+    if (!isSupabaseAvailable()) {
+      return null
+    }
+
+    const normalizedCode = String(formCode || '').trim()
+    const workflows = await this._getActiveWorkflows()
+
+    if (!normalizedCode) {
+      return this._getDefaultWorkflowId(workflows)
+    }
+
+    const matched = workflows.filter(workflow => {
+      const codes = normalizeFormCodes(workflow.form_codes)
+      return codes.length > 0 && codes.includes(normalizedCode)
+    })
+
+    if (matched.length > 0) {
+      const preferred = matched.find(workflow => !workflow.is_default) || matched[0]
+      return preferred.id
+    }
+
+    return this._getDefaultWorkflowId(workflows)
+  },
+
+  /**
+   * 依表單 ID 解析審核流程（form_codes 匹配 > 預設流程）
+   */
+  async resolveWorkflowIdForForm (formId) {
+    if (!isSupabaseAvailable() || !formId) {
+      return this._getDefaultWorkflowId()
+    }
+
+    const { data: form, error } = await supabase
+      .from('forms')
+      .select('form_code')
+      .eq('id', formId)
+      .maybeSingle()
+
+    if (error) {
+      throw error
+    }
+
+    return this.resolveWorkflowIdByFormCode(form?.form_code)
+  },
+
+  /**
+   * @deprecated 請改用 resolveWorkflowIdForForm
+   */
+  async _resolveWorkflowIdForForm (formId) {
+    return this.resolveWorkflowIdForForm(formId)
   },
 
   /**
@@ -368,22 +487,12 @@ export default {
       throw new Error('Supabase 客戶端未初始化')
     }
 
-    // 如果沒有指定 workflow_id，嘗試找到預設流程
+    // 如果沒有指定 workflow_id，依表單 form_code 匹配流程，否則使用預設流程
     if (!recordData.workflow_id) {
-      const { data: defaultWorkflow } = await supabase
-        .from('approval_workflows')
-        .select('id')
-        .eq('is_default', true)
-        .eq('is_active', true)
-        .single()
-
-      if (defaultWorkflow) {
-        recordData.workflow_id = defaultWorkflow.id
-      }
+      recordData.workflow_id = recordData.form_id
+        ? await this.resolveWorkflowIdForForm(recordData.form_id)
+        : await this._getDefaultWorkflowId()
     }
-
-    // 初始狀態設為 DRAFT
-    recordData.current_status_code = 'DRAFT'
 
     // 如果找到 workflow_id，取得第一個步驟（含條件型分支判斷）
     let firstStep = null
@@ -396,7 +505,17 @@ export default {
 
       if (firstStep) {
         recordData.current_step_id = firstStep.id
+        recordData.current_status_code = firstStep.status_code || 'DRAFT'
+      } else {
+        const { data: workflow } = await supabase
+          .from('approval_workflows')
+          .select('initial_status_code')
+          .eq('id', recordData.workflow_id)
+          .maybeSingle()
+        recordData.current_status_code = workflow?.initial_status_code || 'DRAFT'
       }
+    } else {
+      recordData.current_status_code = 'DRAFT'
     }
 
     const { data, error } = await supabase
@@ -409,15 +528,24 @@ export default {
       throw error
     }
 
-    // 建立提交記錄（從 null 到 DRAFT）
+    // 建立提交記錄
     await this._createActionLog({
       approval_record_id: data.id,
       step_id: data.current_step_id,
       action: 'SUBMIT',
       approver_id: recordData.applicant_id,
       from_status_code: null,
-      to_status_code: 'DRAFT',
+      to_status_code: data.current_status_code,
     })
+
+    // 同步表單資料狀態
+    if (data.current_status_code) {
+      await this._updateFormDataStatus(
+        recordData.form_id,
+        recordData.record_id,
+        data.current_status_code,
+      )
+    }
 
     // 如果找到第一個步驟，檢查是否需要自動處理
     if (firstStep && recordData.workflow_id) {
@@ -433,6 +561,96 @@ export default {
       .single()
 
     return updatedRecord || data
+  },
+
+  /**
+   * 內部方法：取得下一個一般流程步驟（依 step_order）
+   */
+  async _getNextRegularStepAfter (workflowId, currentStepOrder) {
+    if (!workflowId || currentStepOrder == null) {
+      return null
+    }
+
+    const { data } = await supabase
+      .from('approval_workflow_steps')
+      .select('id, status_code, approver_type, step_order')
+      .eq('workflow_id', workflowId)
+      .eq('is_conditional', false)
+      .gt('step_order', currentStepOrder)
+      .order('step_order', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    return data
+  },
+
+  /**
+   * 內部方法：解析核准後的下一個步驟
+   */
+  async _resolveNextStepOnApprove (currentStep, workflowId) {
+    if (!currentStep || !workflowId) {
+      return { nextStepId: null, toStatus: null, isCompleted: false }
+    }
+
+    let nextStepId = currentStep.next_step_on_approve
+    let toStatus = null
+    let isCompleted = false
+
+    if (nextStepId) {
+      const { data: nextStep } = await supabase
+        .from('approval_workflow_steps')
+        .select('id, status_code')
+        .eq('id', nextStepId)
+        .maybeSingle()
+
+      if (nextStep) {
+        toStatus = nextStep.status_code
+        nextStepId = nextStep.id
+      } else {
+        toStatus = currentStep.approve_status_code || currentStep.status_code
+        nextStepId = null
+      }
+    }
+
+    if (!nextStepId) {
+      const nextRegularStep = await this._getNextRegularStepAfter(workflowId, currentStep.step_order)
+      if (nextRegularStep) {
+        return {
+          nextStepId: nextRegularStep.id,
+          toStatus: nextRegularStep.status_code,
+          isCompleted: false,
+        }
+      }
+    }
+
+    if (!nextStepId) {
+      const { data: workflow } = await supabase
+        .from('approval_workflows')
+        .select('final_status_code')
+        .eq('id', workflowId)
+        .maybeSingle()
+
+      toStatus = currentStep.approve_status_code || workflow?.final_status_code || 'APPROVED'
+      isCompleted = toStatus === 'APPROVED'
+
+      if (!isCompleted && toStatus) {
+        const { data: stepByStatus } = await supabase
+          .from('approval_workflow_steps')
+          .select('id, status_code')
+          .eq('workflow_id', workflowId)
+          .eq('status_code', toStatus)
+          .order('step_order', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+
+        if (stepByStatus) {
+          nextStepId = stepByStatus.id
+          toStatus = stepByStatus.status_code
+        }
+      }
+    }
+
+    return { nextStepId, toStatus, isCompleted }
   },
 
   /**
@@ -471,69 +689,10 @@ export default {
     }
 
     // 自動核准當前步驟
-    const nextStepId = currentStep.next_step_on_approve
-    let toStatus = null
-    let toStepId = null
-    let isCompleted = false
-
-    if (nextStepId) {
-      // 有下一步驟，取得下一步驟的狀態作為當前狀態
-      const { data: nextStep } = await supabase
-        .from('approval_workflow_steps')
-        .select('id, status_code, approver_type')
-        .eq('id', nextStepId)
-        .single()
-
-      if (nextStep) {
-        // 使用下一步驟的 status_code 作為當前狀態
-        toStatus = nextStep.status_code
-        toStepId = nextStep.id
-      } else {
-        // 如果找不到下一步驟，使用當前步驟的 approve_status_code
-        toStatus = currentStep.approve_status_code || currentStep.status_code
-        // 嘗試根據狀態代碼找到對應的步驟
-        if (toStatus && record.workflow_id) {
-          const { data: stepByStatus } = await supabase
-            .from('approval_workflow_steps')
-            .select('id')
-            .eq('workflow_id', record.workflow_id)
-            .eq('status_code', toStatus)
-            .order('step_order', { ascending: true })
-            .limit(1)
-            .maybeSingle()
-
-          if (stepByStatus) {
-            toStepId = stepByStatus.id
-          }
-        }
-      }
-    } else {
-      // 沒有下一步，表示流程完成，使用當前步驟的 approve_status_code 或流程的 final_status_code
-      const { data: workflow } = await supabase
-        .from('approval_workflows')
-        .select('final_status_code')
-        .eq('id', workflowId)
-        .single()
-
-      toStatus = currentStep.approve_status_code || workflow?.final_status_code || 'APPROVED'
-      // 只有當狀態為 APPROVED 時，才設定 is_completed = true
-      isCompleted = toStatus === 'APPROVED'
-      // 如果狀態不是 APPROVED，嘗試找到對應的步驟
-      if (!isCompleted && toStatus && record.workflow_id) {
-        const { data: stepByStatus } = await supabase
-          .from('approval_workflow_steps')
-          .select('id')
-          .eq('workflow_id', record.workflow_id)
-          .eq('status_code', toStatus)
-          .order('step_order', { ascending: true })
-          .limit(1)
-          .maybeSingle()
-
-        if (stepByStatus) {
-          toStepId = stepByStatus.id
-        }
-      }
-    }
+    const { nextStepId, toStatus, isCompleted } = await this._resolveNextStepOnApprove(
+      currentStep,
+      workflowId,
+    )
 
     // 更新審核記錄
     const updateData = {
@@ -574,17 +733,15 @@ export default {
     await this._updateFormDataStatus(record.form_id, record.record_id, toStatus)
 
     // 如果還有下一步驟，且下一步驟也是 AUTO，繼續處理
-    const finalStepId = toStepId || nextStepId
-    if (finalStepId && !isCompleted) {
+    if (nextStepId && !isCompleted) {
       const { data: nextStep } = await supabase
         .from('approval_workflow_steps')
         .select('approver_type')
-        .eq('id', finalStepId)
-        .single()
+        .eq('id', nextStepId)
+        .maybeSingle()
 
       if (nextStep && nextStep.approver_type === 'AUTO') {
-        // 遞迴處理下一步驟
-        await this._processAutoApprovalSteps(approvalRecordId, workflowId, finalStepId)
+        await this._processAutoApprovalSteps(approvalRecordId, workflowId, nextStepId)
       }
     }
   },
@@ -858,8 +1015,35 @@ export default {
     const currentUserRole = currentUserProfile.role
     const currentUserDepartment = currentUserProfile.department
 
-    // 構建 SQL 查詢
-    // 1. 查詢狀態類型為 INTERMEDIATE 的審核記錄
+    const { data: allUserProfiles } = await supabase
+      .from('user_profiles')
+      .select('id, username')
+
+    const usernameToUserId = new Map(
+      (allUserProfiles || [])
+        .filter(profile => profile.username)
+        .map(profile => [profile.username, profile.id]),
+    )
+
+    const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+    const resolveStoredUserId = (value) => {
+      if (value == null) return null
+      const str = String(value).trim()
+      if (!str) return null
+      if (UUID_PATTERN.test(str)) return str
+      return usernameToUserId.get(str) || null
+    }
+
+    const resolveStoredUserIds = (values) => {
+      return [...new Set((values || []).map(resolveStoredUserId).filter(Boolean))]
+    }
+
+    const isCurrentUserInApproverList = (values) => {
+      return resolveStoredUserIds(values).includes(currentUserId)
+    }
+
+    // 1. 查詢待審核的審核記錄
     // 2. 關聯當前步驟和狀態資訊
     // 3. 檢查當前用戶是否符合審核條件
 
@@ -900,7 +1084,7 @@ export default {
       LEFT JOIN approval_statuses ast ON ar.current_status_code = ast.status_code
       LEFT JOIN approval_workflows aw ON ar.workflow_id = aw.id
       WHERE ar.is_completed = FALSE
-        AND ast.status_type = 'INTERMEDIATE'
+        AND (ast.status_type IS NULL OR ast.status_type <> 'FINAL')
     `
 
     const sqlParams = []
@@ -1083,9 +1267,9 @@ export default {
       console.log('狀態:', status?.status_code, '狀態類型:', status?.status_type)
       console.log('步驟:', step?.step_name, '審核人類型:', step?.approver_type)
 
-      // 只處理狀態類型為 INTERMEDIATE 的記錄
-      if (!status || status.status_type !== 'INTERMEDIATE') {
-        console.log('❌ 過濾原因: 狀態類型不是 INTERMEDIATE')
+      // 排除已完成；允許 INTERMEDIATE 與等待人工審核的 INITIAL 狀態
+      if (!status || status.status_type === 'FINAL') {
+        console.log('❌ 過濾原因: 狀態為最終狀態或缺少狀態')
         return false
       }
 
@@ -1113,24 +1297,23 @@ export default {
         return false
       }
 
+      // 系統管理員可檢視所有待審核項目
+      if (currentUserRole === 'admin') {
+        console.log('✓ 管理員可審核此項目')
+        return true
+      }
+
+      // 檢查審核條件
       if (approverType === 'USER') {
-        // 指定使用者：檢查是否在審核人列表中
-        const userIds = approverUserIds.length > 0
-          ? approverUserIds
-          : (approverConfig.user_ids || [])
+        const userIds = resolveStoredUserIds([
+          ...approverUserIds,
+          ...(approverConfig.user_ids || []),
+        ])
 
         console.log('USER 類型檢查 - 審核人 ID 列表:', userIds)
 
         if (userIds.length > 0) {
-          const isInUserList = userIds.some(uid => {
-            const userIdStr = typeof uid === 'string' ? uid : uid.toString()
-            const currentUserIdStr = currentUserId.toString()
-            const matches = userIdStr === currentUserIdStr
-            console.log(`  比較: ${userIdStr} === ${currentUserIdStr} => ${matches}`)
-            return matches
-          })
-
-          if (!isInUserList) {
+          if (!isCurrentUserInApproverList(userIds)) {
             console.log('❌ 過濾原因: 當前用戶不在審核人列表中')
             return false
           }
@@ -1171,16 +1354,8 @@ export default {
 
         // 如果有指定審核人列表，進一步檢查
         if (approverUserIds.length > 0) {
-          console.log('檢查審核人列表:', approverUserIds)
-          const isInUserList = approverUserIds.some(uid => {
-            const userIdStr = typeof uid === 'string' ? uid : uid.toString()
-            const currentUserIdStr = currentUserId.toString()
-            const matches = userIdStr === currentUserIdStr
-            console.log(`  比較: ${userIdStr} === ${currentUserIdStr} => ${matches}`)
-            return matches
-          })
-
-          if (!isInUserList) {
+          console.log('檢查審核人列表:', resolveStoredUserIds(approverUserIds))
+          if (!isCurrentUserInApproverList(approverUserIds)) {
             console.log('❌ 過濾原因: 當前用戶不在審核人列表中')
             return false
           }
@@ -1206,16 +1381,8 @@ export default {
 
         // 如果有指定審核人列表，進一步檢查
         if (approverUserIds.length > 0) {
-          console.log('檢查審核人列表:', approverUserIds)
-          const isInUserList = approverUserIds.some(uid => {
-            const userIdStr = typeof uid === 'string' ? uid : uid.toString()
-            const currentUserIdStr = currentUserId.toString()
-            const matches = userIdStr === currentUserIdStr
-            console.log(`  比較: ${userIdStr} === ${currentUserIdStr} => ${matches}`)
-            return matches
-          })
-
-          if (!isInUserList) {
+          console.log('檢查審核人列表:', resolveStoredUserIds(approverUserIds))
+          if (!isCurrentUserInApproverList(approverUserIds)) {
             console.log('❌ 過濾原因: 當前用戶不在審核人列表中')
             return false
           }

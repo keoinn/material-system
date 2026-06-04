@@ -229,7 +229,6 @@ CREATE TABLE IF NOT EXISTS forms (
   description TEXT, -- 表單說明
   version INTEGER DEFAULT 1, -- 表單版本號
   is_active BOOLEAN DEFAULT TRUE, -- 是否啟用
-  is_default BOOLEAN DEFAULT FALSE, -- 是否為預設表單
   form_config JSONB, -- 表單級別的額外設定（JSON格式）
   created_by_id UUID REFERENCES user_profiles(id), -- 建立人
   updated_by_id UUID REFERENCES user_profiles(id), -- 更新人
@@ -243,7 +242,6 @@ COMMENT ON COLUMN forms.form_config IS '表單設定：JSON格式，可儲存表
 
 CREATE INDEX IF NOT EXISTS idx_forms_form_code ON forms(form_code);
 CREATE INDEX IF NOT EXISTS idx_forms_is_active ON forms(is_active);
-CREATE INDEX IF NOT EXISTS idx_forms_is_default ON forms(is_default);
 CREATE INDEX IF NOT EXISTS idx_forms_created_by_id ON forms(created_by_id);
 
 CREATE TRIGGER update_forms_updated_at
@@ -611,6 +609,7 @@ CREATE TABLE IF NOT EXISTS approval_workflows (
   initial_status_code VARCHAR(50) REFERENCES approval_statuses(status_code), -- 初始狀態
   final_status_code VARCHAR(50) REFERENCES approval_statuses(status_code), -- 最終狀態（核准）
   reject_status_code VARCHAR(50) REFERENCES approval_statuses(status_code), -- 退回狀態
+  form_codes JSONB NOT NULL DEFAULT '[]'::jsonb, -- 套用此流程的表單代碼列表；空陣列表示通用流程
   created_by_id UUID REFERENCES user_profiles(id), -- 建立人
   updated_by_id UUID REFERENCES user_profiles(id), -- 更新人
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -619,6 +618,7 @@ CREATE TABLE IF NOT EXISTS approval_workflows (
 
 COMMENT ON TABLE approval_workflows IS '審核流程配置表：定義審核流程（所有表單共用）';
 COMMENT ON COLUMN approval_workflows.workflow_code IS '流程代碼：唯一識別碼，例如 default_workflow';
+COMMENT ON COLUMN approval_workflows.form_codes IS '套用此流程的表單代碼列表（JSON 陣列）；空陣列表示通用流程';
 
 CREATE INDEX IF NOT EXISTS idx_approval_workflows_workflow_code ON approval_workflows(workflow_code);
 CREATE INDEX IF NOT EXISTS idx_approval_workflows_is_default ON approval_workflows(is_default);

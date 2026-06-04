@@ -278,6 +278,10 @@
    * 導航到指定的 tab
    */
   function navigateToTab (tab) {
+    if (tab === 'batch-apply') {
+      router.push({ path: '/', query: { tab, batchView: 'select' } })
+      return
+    }
     router.push({ path: '/', query: { tab } })
   }
 
