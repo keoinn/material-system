@@ -9,6 +9,9 @@
 --
 -- 使用方式: 在 Supabase SQL Editor 貼上並執行全文
 -- 含種子資料版本: supabase_schema_master.sql
+-- 結構 + 系統 seed 分開執行:
+--   1. 本檔（結構）
+--   2. supabase_schema_seeder_master.sql（roles、permissions 等）
 -- ============================================================================
 
 -- 第一部分：刪除不需要的資料表

@@ -16,6 +16,10 @@
 --
 -- 使用方式: 在 Supabase SQL Editor 貼上並執行全文
 -- 個別模組檔案仍保留於同目錄，供參考或局部更新
+--
+-- 系統 seed 亦可拆開執行:
+--   結構: supabase_schema_withoutdata_master.sql
+--   資料: supabase_schema_seeder_master.sql
 -- ============================================================================
 
 -- 第一部分：刪除不需要的資料表
@@ -543,18 +547,20 @@ CREATE TRIGGER update_role_page_access_updated_at
   EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================================
--- 4. 初始化系統內建角色
+-- 4. 初始化系統內建角色（與 supabase_schema_seeder_master.sql 第 1 節同步）
 -- ============================================================================
 INSERT INTO roles (role_code, role_name, role_name_en, description, is_system_role, is_active, display_order)
 VALUES
-  ('admin', '系統管理員', 'Administrator', '擁有所有權限，可管理系統設定和使用者', TRUE, TRUE, 1),
-  ('approver', '審核人員', 'Approver', '可審核和核准物料申請', TRUE, TRUE, 2),
+  ('admin', '系統管理員', 'Administrator', '擁有所有權限', TRUE, TRUE, 1),
+  ('approver', '審核人員', 'Approver', '可審核物料申請', TRUE, TRUE, 2),
   ('applicant', '申請人員', 'Applicant', '可提交物料申請', TRUE, TRUE, 3)
 ON CONFLICT (role_code) DO UPDATE SET
   role_name = EXCLUDED.role_name,
   role_name_en = EXCLUDED.role_name_en,
   description = EXCLUDED.description,
-  updated_at = NOW();
+  is_system_role = EXCLUDED.is_system_role,
+  is_active = EXCLUDED.is_active,
+  display_order = EXCLUDED.display_order;
 
 -- ============================================================================
 -- 5. 初始化系統內建權限
@@ -577,12 +583,14 @@ ON CONFLICT (permission_code) DO UPDATE SET
   permission_name_en = EXCLUDED.permission_name_en,
   module = EXCLUDED.module,
   description = EXCLUDED.description,
+  is_system_permission = EXCLUDED.is_system_permission,
+  is_active = EXCLUDED.is_active,
+  display_order = EXCLUDED.display_order,
   updated_at = NOW();
 
 -- ============================================================================
 -- 6. 初始化角色權限關聯（預設權限分配）
 -- ============================================================================
--- 系統管理員擁有所有權限
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
@@ -590,7 +598,6 @@ CROSS JOIN permissions p
 WHERE r.role_code = 'admin'
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
--- 審核人員擁有審核、查詢、匯出權限
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
@@ -599,7 +606,6 @@ WHERE r.role_code = 'approver'
   AND p.permission_code IN ('REVIEW', 'QUERY', 'EXPORT', 'APPLY')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
--- 申請人員擁有申請、查詢、匯出權限
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
@@ -934,7 +940,7 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- 7. 初始化預設審核狀態
+-- 7. 初始化預設審核狀態（與 supabase_schema_seeder_master.sql 第 4 節同步）
 -- ============================================================================
 INSERT INTO approval_statuses (status_code, status_name, status_name_en, description, status_type, color, icon, display_order) VALUES
   ('DRAFT', '草稿', 'Draft', '申請草稿，尚未提交', 'INITIAL', 'grey', 'mdi-file-document-outline', 1),
@@ -1463,46 +1469,25 @@ ON CONFLICT (setting_key) DO UPDATE SET
 -- ============================================================================
 
 -- ============================================================================
--- 為現有角色添加「選項活頁簿」頁面權限
--- 用途：為所有現有角色添加「選項活頁簿」頁面權限
--- 執行時間：在新增「選項活頁簿」功能後執行
+-- 角色頁面權限（選項活頁簿，與 supabase_schema_seeder_master.sql 第 5 節同步）
 -- ============================================================================
-
--- 為所有現有角色添加「選項活頁簿」頁面權限
--- 預設：系統管理員可以訪問，其他角色需要手動設定
 INSERT INTO role_page_access (role_id, page_code, page_name, is_accessible)
-SELECT 
+SELECT
   r.id,
   'option-workbooks',
   '選項活頁簿',
-  CASE 
-    WHEN r.role_code = 'admin' THEN TRUE  -- 系統管理員預設可以訪問
-    ELSE FALSE  -- 其他角色預設不可訪問，需要手動設定
+  CASE
+    WHEN r.role_code = 'admin' THEN TRUE
+    ELSE FALSE
   END
 FROM roles r
 WHERE NOT EXISTS (
-  SELECT 1 
-  FROM role_page_access rpa 
-  WHERE rpa.role_id = r.id 
-  AND rpa.page_code = 'option-workbooks'
+  SELECT 1
+  FROM role_page_access rpa
+  WHERE rpa.role_id = r.id
+    AND rpa.page_code = 'option-workbooks'
 )
 ON CONFLICT (role_id, page_code) DO NOTHING;
-
--- 如果希望所有角色都可以訪問，可以使用以下 SQL（取消註解）：
--- INSERT INTO role_page_access (role_id, page_code, page_name, is_accessible)
--- SELECT 
---   r.id,
---   'option-workbooks',
---   '選項活頁簿',
---   TRUE  -- 所有角色都可以訪問
--- FROM roles r
--- WHERE NOT EXISTS (
---   SELECT 1 
---   FROM role_page_access rpa 
---   WHERE rpa.role_id = r.id 
---   AND rpa.page_code = 'option-workbooks'
--- )
--- ON CONFLICT (role_id, page_code) DO NOTHING;
 
 -- ============================================================================
 -- 第十八部分：RPC 函數

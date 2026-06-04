@@ -45,7 +45,8 @@ export function usePermissions () {
       // 根據 role_code 查詢角色
       const role = await rolesService.getRole(userRole)
       if (!role || !role.is_active) {
-        accessiblePages.value = new Set()
+        // roles 表無對應資料時，沿用全頁面可訪問（與 catch 行為一致）
+        accessiblePages.value = new Set(Object.values(PAGE_CODES))
         return
       }
 
@@ -64,7 +65,9 @@ export function usePermissions () {
         )
       }
     } catch (error) {
-      console.error('載入使用者頁面權限失敗', error)
+      if (error?.code !== 'PGRST116') {
+        console.error('載入使用者頁面權限失敗', error)
+      }
       // 如果查詢失敗，預設所有頁面都可以訪問（向後兼容）
       accessiblePages.value = new Set(Object.values(PAGE_CODES))
     } finally {

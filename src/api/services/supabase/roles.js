@@ -50,8 +50,8 @@ export default {
     // 判斷是 ID 還是 role_code
     const isNumeric = /^\d+$/.test(String(id))
     const query = isNumeric
-      ? supabase.from('roles').select('*').eq('id', id).single()
-      : supabase.from('roles').select('*').eq('role_code', id).single()
+      ? supabase.from('roles').select('*').eq('id', id).maybeSingle()
+      : supabase.from('roles').select('*').eq('role_code', id).maybeSingle()
 
     const { data, error } = await query
 

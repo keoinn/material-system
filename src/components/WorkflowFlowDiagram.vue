@@ -193,6 +193,32 @@
       </div>
 
       <div
+        v-if="showIncompleteEnd"
+        class="workflow-flow-diagram__end-incomplete"
+      >
+        <div
+          class="workflow-flow-diagram__node workflow-flow-diagram__node--end workflow-flow-diagram__node--end-incomplete"
+          :title="incompleteEndHint"
+        >
+          <div class="workflow-flow-diagram__node-order workflow-flow-diagram__node-order--label">完成</div>
+          <v-chip
+            color="grey"
+            :size="large ? 'default' : 'small'"
+            variant="tonal"
+          >
+            {{ getStatusName(workflow.final_status_code) }}
+          </v-chip>
+          <div class="workflow-flow-diagram__node-hint mt-2">
+            <v-icon class="mr-1" size="small">mdi-alert-outline</v-icon>
+            審核流程不完整
+          </div>
+          <div class="text-caption text-medium-emphasis mt-1">
+            {{ incompleteEndHint }}
+          </div>
+        </div>
+      </div>
+
+      <div
         v-if="workflow?.reject_status_code"
         class="workflow-flow-diagram__legend mt-3"
       >
@@ -206,7 +232,7 @@
 </template>
 
 <script setup>
-  import { computed, onUnmounted, ref } from 'vue'
+  import { computed, onUnmounted, shallowRef } from 'vue'
 
   const COLUMNS_PER_ROW = 3
   const BRIDGE_ARROW_SIZE = 8
@@ -234,7 +260,7 @@
     },
   })
 
-  const bridgeMetrics = ref({})
+  const bridgeMetrics = shallowRef({})
   const bridgeObservers = new Map()
 
   function bindBridgeEl (rowIndex, el) {
@@ -244,25 +270,30 @@
       bridgeObservers.delete(rowIndex)
     }
 
+    // ref 卸載時不寫入 reactive，避免 patch 期間觸發遞迴更新
     if (!el) {
-      const next = { ...bridgeMetrics.value }
-      delete next[rowIndex]
-      bridgeMetrics.value = next
       return
     }
 
     const updateMetrics = () => {
+      const width = el.clientWidth
+      const height = el.clientHeight
+      const prev = bridgeMetrics.value[rowIndex]
+      if (prev?.width === width && prev?.height === height) {
+        return
+      }
       bridgeMetrics.value = {
         ...bridgeMetrics.value,
-        [rowIndex]: {
-          width: el.clientWidth,
-          height: el.clientHeight,
-        },
+        [rowIndex]: { width, height },
       }
     }
 
-    updateMetrics()
-    const observer = new ResizeObserver(updateMetrics)
+    const scheduleMetricsUpdate = () => {
+      requestAnimationFrame(updateMetrics)
+    }
+
+    scheduleMetricsUpdate()
+    const observer = new ResizeObserver(scheduleMetricsUpdate)
     observer.observe(el)
     bridgeObservers.set(rowIndex, observer)
   }
@@ -274,6 +305,7 @@
   onUnmounted(() => {
     bridgeObservers.forEach(observer => observer.disconnect())
     bridgeObservers.clear()
+    bridgeMetrics.value = {}
   })
 
   const statusMap = computed(() => {
@@ -288,6 +320,53 @@
     return [...props.steps]
       .filter(step => !step.is_conditional)
       .sort((a, b) => a.step_order - b.step_order)
+  })
+
+  function getApproveTargetCode (step, index) {
+    const nextStep = sortedSteps.value[index + 1]
+    if (nextStep?.status_code) {
+      return nextStep.status_code
+    }
+    if (step.approve_status_code) {
+      return step.approve_status_code
+    }
+    return props.workflow?.final_status_code || null
+  }
+
+  /** 最後一步審核通過後是否會進入流程完成狀態 */
+  const reachesFinalStatus = computed(() => {
+    const finalCode = props.workflow?.final_status_code
+    if (!finalCode) {
+      return false
+    }
+    const steps = sortedSteps.value
+    if (steps.length === 0) {
+      return false
+    }
+    const lastIndex = steps.length - 1
+    return getApproveTargetCode(steps[lastIndex], lastIndex) === finalCode
+  })
+
+  const showIncompleteEnd = computed(() => {
+    return Boolean(
+      props.workflow?.final_status_code
+      && sortedSteps.value.length > 0
+      && !reachesFinalStatus.value,
+    )
+  })
+
+  const incompleteEndHint = computed(() => {
+    const finalCode = props.workflow?.final_status_code
+    const finalName = getStatusName(finalCode)
+    const steps = sortedSteps.value
+    if (steps.length === 0) {
+      return '審核流程不完整'
+    }
+    const lastIndex = steps.length - 1
+    const lastStep = steps[lastIndex]
+    const targetCode = getApproveTargetCode(lastStep, lastIndex)
+    const targetName = getStatusName(targetCode)
+    return `最後一步「${lastStep.step_name}」審核通過後為「${targetName}」，未連至完成狀態「${finalName}」（${finalCode}）`
   })
 
   const flowNodes = computed(() => {
@@ -306,7 +385,7 @@
       })
     })
 
-    if (props.workflow?.final_status_code) {
+    if (props.workflow?.final_status_code && reachesFinalStatus.value) {
       nodes.push({ key: 'end', type: 'end' })
     }
 
@@ -481,15 +560,9 @@
   }
 
   function getApproveTargetLabel (step, index) {
-    const nextStep = sortedSteps.value[index + 1]
-    if (nextStep?.status_code) {
-      return getStatusName(nextStep.status_code)
-    }
-    if (step.approve_status_code) {
-      return getStatusName(step.approve_status_code)
-    }
-    if (props.workflow?.final_status_code) {
-      return getStatusName(props.workflow.final_status_code)
+    const targetCode = getApproveTargetCode(step, index)
+    if (targetCode) {
+      return getStatusName(targetCode)
     }
     return '下一步'
   }
@@ -658,6 +731,35 @@
 .workflow-flow-diagram__node--end {
   border-color: rgb(var(--v-theme-success));
   background: rgba(var(--v-theme-success), 0.06);
+}
+
+.workflow-flow-diagram__end-incomplete {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.workflow-flow-diagram__node--end-incomplete {
+  max-width: 320px;
+  border-color: rgba(var(--v-border-color), var(--v-border-opacity));
+  border-style: dashed;
+  background: rgba(var(--v-theme-on-surface), 0.04);
+  opacity: 0.85;
+}
+
+.workflow-flow-diagram__node-hint {
+  display: inline-flex;
+  align-items: center;
+  color: rgb(var(--v-theme-warning));
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.workflow-flow-diagram--large .workflow-flow-diagram__node-hint {
+  font-size: 13px;
 }
 
 .workflow-flow-diagram__node-order {

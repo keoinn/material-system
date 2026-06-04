@@ -13,7 +13,7 @@ import VueExcelEditor from 'vue3-excel-editor'
 export function registerPlugins (app) {
   app
     .use(vuetify)
-    .use(router)
     .use(pinia)
+    .use(router)
     .use(VueExcelEditor)
 }

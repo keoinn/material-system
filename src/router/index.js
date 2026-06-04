@@ -51,42 +51,13 @@ router.beforeEach(async (to, from, next) => {
       return
     }
 
-    // 檢查認證狀態（異步，添加超時保護）
     let isAuthenticated = false
     try {
-      // 如果已經有正在進行的檢查，直接使用當前狀態
-      if (authStore.checkingAuth) {
-        // 等待一小段時間讓檢查完成（最多等待 1 秒）
-        const quickCheckPromise = new Promise(resolve => {
-          let waitCount = 0
-          const maxWait = 20 // 20 * 50ms = 1秒
-          const checkInterval = setInterval(() => {
-            waitCount++
-            if (!authStore.checkingAuth || waitCount >= maxWait) {
-              clearInterval(checkInterval)
-              resolve(authStore.isAuthenticated && authStore.user !== null)
-            }
-          }, 50)
-        })
-        isAuthenticated = await quickCheckPromise
-      } else {
-        // 使用 Promise.race 添加超時保護（最多等待 3 秒）
-        const authCheckPromise = authStore.checkAuth()
-        const timeoutPromise = new Promise(resolve => {
-          setTimeout(() => {
-            console.warn('認證檢查超時，視為未登入')
-            resolve(false)
-          }, 3000) // 減少到 3 秒，因為 checkAuth 已經優化
-        })
-
-        const result = await Promise.race([authCheckPromise, timeoutPromise])
-        isAuthenticated = result === true
-      }
+      await authStore.waitForAuthReady()
+      isAuthenticated = await authStore.checkAuth()
     } catch (error) {
       console.error('認證檢查失敗', error)
-      // 認證檢查失敗時，視為未登入
       isAuthenticated = false
-      // 確保重置 loading 狀態
       if (authStore.loading) {
         authStore.loading = false
       }

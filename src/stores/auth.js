@@ -54,7 +54,35 @@ export const useAuthStore = defineStore('auth', () => {
     } : null
   })
   const isLoggedIn = computed(() => isAuthenticated.value && user.value !== null)
-  const userRole = computed(() => userProfile.value?.role || currentUser.value?.role || null)
+  // 僅在 user_profile 載入後回傳角色，避免重整時以預設 applicant 誤觸權限查詢
+  const userRole = computed(() => userProfile.value?.role ?? null)
+
+  /** 合併並發的 checkAuth 請求，避免路由守衛與初始化重複檢查 */
+  let authCheckInFlight = null
+
+  /** Supabase 完成 INITIAL_SESSION 後才為 true（避免與 onAuthStateChange 死鎖） */
+  let authReadyResolved = !isSupabaseAvailable()
+  let resolveAuthReady = null
+  const authReadyPromise = new Promise(resolve => {
+    resolveAuthReady = resolve
+  })
+
+  function markAuthReady () {
+    if (authReadyResolved) return
+    authReadyResolved = true
+    resolveAuthReady?.()
+  }
+
+  /**
+   * 等待 Supabase 完成 session 還原（路由守衛應先 await 此函式）
+   */
+  async function waitForAuthReady (maxMs = 10000) {
+    if (authReadyResolved) return
+    await Promise.race([
+      authReadyPromise,
+      new Promise(resolve => setTimeout(resolve, maxMs)),
+    ])
+  }
 
   // Actions
   /**
@@ -228,115 +256,98 @@ export const useAuthStore = defineStore('auth', () => {
    * 檢查認證狀態
    */
   async function checkAuth () {
-    // 避免重複檢查
-    if (checkingAuth.value) {
-      // 如果正在檢查，直接返回當前認證狀態，不等待
-      // 這樣可以避免 router guard 超時
-      return isAuthenticated.value && user.value !== null
+    if (authCheckInFlight) {
+      return authCheckInFlight
     }
 
-    checkingAuth.value = true
-    loading.value = true
-    try {
-      if (!isSupabaseAvailable()) {
-        // 如果 Supabase 不可用，回退到開發模式
-        const storedAuth = localStorage.getItem('isAuthenticated')
-        if (storedAuth === 'true') {
-          const storedUser = localStorage.getItem('user')
-          if (storedUser) {
-            try {
-              const parsedUser = JSON.parse(storedUser)
-              user.value = parsedUser
-              isAuthenticated.value = true
-              return true
-            } catch {
-              // 忽略解析錯誤
+    authCheckInFlight = (async () => {
+      checkingAuth.value = true
+      loading.value = true
+      try {
+        if (!isSupabaseAvailable()) {
+          const storedAuth = localStorage.getItem('isAuthenticated')
+          if (storedAuth === 'true') {
+            const storedUser = localStorage.getItem('user')
+            if (storedUser) {
+              try {
+                const parsedUser = JSON.parse(storedUser)
+                user.value = parsedUser
+                isAuthenticated.value = true
+                return true
+              } catch {
+                // 忽略解析錯誤
+              }
             }
           }
+          return false
         }
-        // 確保重置 loading 狀態
-        loading.value = false
-        checkingAuth.value = false
-        return false
-      }
 
-      // 檢查 Supabase session
-      let session
-      try {
-        session = await authService.getSession()
-      } catch (error) {
-        console.error('獲取 session 失敗', error)
-        session = null
-      }
+        // 先等 INITIAL_SESSION，避免在 onAuthStateChange 內呼叫 getSession 造成死鎖
+        await waitForAuthReady()
 
-      if (!session) {
-        user.value = null
-        userProfile.value = null
-        isAuthenticated.value = false
-        token.value = null
-        // 確保重置 loading 狀態
-        loading.value = false
-        checkingAuth.value = false
-        return false
-      }
-
-      // 獲取當前用戶
-      let authUser
-      try {
-        authUser = await authService.getCurrentUser()
-      } catch (error) {
-        console.error('獲取當前用戶失敗', error)
-        authUser = null
-      }
-
-      if (!authUser) {
-        user.value = null
-        userProfile.value = null
-        isAuthenticated.value = false
-        token.value = null
-        // 確保重置 loading 狀態
-        loading.value = false
-        checkingAuth.value = false
-        return false
-      }
-
-      user.value = authUser
-      token.value = session.access_token
-      isAuthenticated.value = true
-
-      // 先重置狀態，允許其他檢查繼續
-      loading.value = false
-      checkingAuth.value = false
-
-      // 載入 user_profile（異步執行，不阻塞認證流程）
-      Promise.resolve().then(async () => {
-        try {
-          await loadUserProfile(authUser.id)
-          // 檢查用戶是否已啟用（在 profile 載入後）
-          if (userProfile.value && !userProfile.value.is_active) {
+        if (isAuthenticated.value && user.value) {
+          if (!userProfile.value) {
             try {
-              await logout()
+              await loadUserProfile(user.value.id)
+              if (userProfile.value && !userProfile.value.is_active) {
+                await logout()
+                return false
+              }
             } catch (error) {
-              console.error('登出失敗', error)
+              console.error('載入 user_profile 失敗', error)
             }
+          }
+          return true
+        }
+
+        let session
+        try {
+          session = await authService.getSession()
+        } catch (error) {
+          console.error('獲取 session 失敗', error)
+          session = null
+        }
+
+        if (!session?.user) {
+          user.value = null
+          userProfile.value = null
+          isAuthenticated.value = false
+          token.value = null
+          return false
+        }
+
+        user.value = session.user
+        token.value = session.access_token
+        isAuthenticated.value = true
+
+        try {
+          await loadUserProfile(session.user.id)
+          if (userProfile.value && !userProfile.value.is_active) {
+            await logout()
+            return false
           }
         } catch (error) {
           console.error('載入 user_profile 失敗', error)
-          // 即使載入失敗，也允許認證繼續
         }
-      })
 
-      return true
-    } catch (error) {
-      console.error('檢查認證狀態錯誤', error)
-      user.value = null
-      userProfile.value = null
-      isAuthenticated.value = false
-      token.value = null
-      return false
+        return true
+      } catch (error) {
+        console.error('檢查認證狀態錯誤', error)
+        user.value = null
+        userProfile.value = null
+        isAuthenticated.value = false
+        token.value = null
+        return false
+      } finally {
+        loading.value = false
+        checkingAuth.value = false
+      }
+    })()
+
+    try {
+      return await authCheckInFlight
     } finally {
-      loading.value = false
-      checkingAuth.value = false
+      authCheckInFlight = null
     }
   }
 
@@ -377,58 +388,69 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
 
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.id)
+    // 回呼內不可同步呼叫其他 Supabase Auth API，否則會與 getSession 死鎖
+    supabase.auth.onAuthStateChange((event, session) => {
+      setTimeout(async () => {
+        console.log('Auth state changed:', event, session?.user?.id)
 
-      try {
-        if (event === 'SIGNED_IN' && session?.user) {
-          user.value = session.user
-          token.value = session.access_token
-          isAuthenticated.value = true
-          // 異步載入 user_profile，不阻塞
-          loadUserProfile(session.user.id).then(() => {
-            // 檢查用戶是否已啟用
-            if (userProfile.value && !userProfile.value.is_active) {
-              logout().catch(error => {
-                console.error('登出失敗', error)
-              })
+        try {
+          if (event === 'INITIAL_SESSION') {
+            if (session?.user) {
+              user.value = session.user
+              token.value = session.access_token
+              isAuthenticated.value = true
+              try {
+                await loadUserProfile(session.user.id)
+                if (userProfile.value && !userProfile.value.is_active) {
+                  await logout()
+                }
+              } catch (error) {
+                console.error('載入 user_profile 失敗', error)
+              }
+            } else {
+              user.value = null
+              userProfile.value = null
+              isAuthenticated.value = false
+              token.value = null
             }
-          }).catch(error => {
-            console.error('載入 user_profile 失敗', error)
-          })
-        } else if (event === 'SIGNED_OUT') {
-          user.value = null
-          userProfile.value = null
-          isAuthenticated.value = false
-          token.value = null
-          loading.value = false
-          checkingAuth.value = false
-        } else if (event === 'TOKEN_REFRESHED' && session) {
-          token.value = session.access_token
-        } else if (event === 'INITIAL_SESSION' && session) {
-          // 初始化 session，不設置 loading
-          if (session.user) {
+            markAuthReady()
+            return
+          }
+
+          if (event === 'SIGNED_IN' && session?.user) {
             user.value = session.user
             token.value = session.access_token
             isAuthenticated.value = true
-            // 異步載入 user_profile
-            loadUserProfile(session.user.id).catch(error => {
+            try {
+              await loadUserProfile(session.user.id)
+              if (userProfile.value && !userProfile.value.is_active) {
+                await logout()
+              }
+            } catch (error) {
               console.error('載入 user_profile 失敗', error)
-            })
+            }
+          } else if (event === 'SIGNED_OUT') {
+            user.value = null
+            userProfile.value = null
+            isAuthenticated.value = false
+            token.value = null
+            loading.value = false
+            checkingAuth.value = false
+          } else if (event === 'TOKEN_REFRESHED' && session) {
+            token.value = session.access_token
+          }
+        } catch (error) {
+          console.error('Auth state change 處理錯誤', error)
+          if (event === 'SIGNED_OUT' || !session) {
+            user.value = null
+            userProfile.value = null
+            isAuthenticated.value = false
+            token.value = null
+            loading.value = false
+            checkingAuth.value = false
           }
         }
-      } catch (error) {
-        console.error('Auth state change 處理錯誤', error)
-        // 確保狀態正確
-        if (event === 'SIGNED_OUT' || !session) {
-          user.value = null
-          userProfile.value = null
-          isAuthenticated.value = false
-          token.value = null
-          loading.value = false
-          checkingAuth.value = false
-        }
-      }
+      }, 0)
     })
   }
 
@@ -496,39 +518,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // 初始化
-  setupAuthListener()
-  // 異步初始化認證檢查，不阻塞 store 創建
-  // 使用 setTimeout 確保 store 完全初始化後再檢查
-  // 不設置 loading，避免影響 UI 顯示
-  setTimeout(() => {
-    // 只在有 session 時才檢查（避免不必要的檢查）
-    if (isSupabaseAvailable()) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          checkAuth().catch(error => {
-            console.error('初始化認證檢查失敗', error)
-            // 確保重置狀態
-            loading.value = false
-            checkingAuth.value = false
-          })
-        } else {
-          // 沒有 session，確保狀態已清除
-          user.value = null
-          userProfile.value = null
-          isAuthenticated.value = false
-          token.value = null
-          loading.value = false
-          checkingAuth.value = false
-        }
-      }).catch(error => {
-        console.error('獲取初始 session 失敗', error)
-        // 確保重置狀態
-        loading.value = false
-        checkingAuth.value = false
-      })
-    }
-  }, 100) // 稍微延遲，確保所有組件都已初始化
+  // 初始化：由 onAuthStateChange 的 INITIAL_SESSION 還原登入狀態
+  if (isSupabaseAvailable()) {
+    setupAuthListener()
+  } else {
+    markAuthReady()
+  }
 
   return {
     // State
@@ -547,6 +542,7 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     register,
     checkAuth,
+    waitForAuthReady,
     updateUser,
     loadUserProfile,
   }
